@@ -828,18 +828,37 @@ git commit -m "feat: plugin load capability probe and assisted fallback"
 - Create: `src/fl_studio_mcp/tools/export.py`
 - Test: `tests/test_export_tools.py`
 
-Contexte : `project_render` n'est pas scriptable (limitation geezoria). Stratégies : (a) sonder l'API runtime, (b) lire le chemin des fichiers audio source des channels (suffit pour analyser des pistes enregistrées/importées non encore traitées), (c) repli assisté (l'utilisateur exporte, le serveur lit le fichier).
+Contexte : `project_render` n'est pas scriptable, MAIS l'API expose l'enregistrement disque par piste mixer : `mixer.armTrack(index)` (toggle), `mixer.isTrackArmed(index)`, `mixer.getTrackRecordingFileName(index)` (chemin du WAV en cours d'écriture). Le bridge ne peut pas lire les fichiers (accès disque désactivé dans FL), mais le serveur MCP tourne hors FL et lit le fichier librement. Capture POST-effets — exactement ce qu'il faut pour la vérification A/B. Stratégies : (a) armement + enregistrement (principale), (b) lire le chemin des fichiers audio source des channels (pré-effets, analyse initiale), (c) repli assisté (l'utilisateur exporte, le serveur lit le fichier). Bonus : `mixer.getTrackPeaks(index, mode)` pour le metering temps réel.
 
 - [ ] **Step 1: Actions bridge**
 
 ```python
 def _export_capabilities(p):
-    """Probe runtime API for any render/export entry points."""
+    """Probe runtime API for render/export and disk-recording entry points."""
     report = {}
     for mod, fn in ((transport, "render"), (general, "renderProject"),
-                    (mixer, "saveAudio"), (ui, "exportAudio")):
+                    (mixer, "saveAudio"), (ui, "exportAudio"),
+                    (mixer, "armTrack"), (mixer, "isTrackArmed"),
+                    (mixer, "getTrackRecordingFileName"),
+                    (mixer, "getTrackPeaks")):
         report[f"{mod.__name__}.{fn}"] = hasattr(mod, fn)
     return report
+
+
+def _track_record_arm(p):
+    """Arm/disarm a mixer track for disk recording and report the target file.
+
+    Flow (orchestrated by the MCP server, which CAN read files):
+    arm -> transport record+play -> FL writes WAV -> disarm -> server reads it.
+    """
+    track = int(p["track"])
+    want = bool(p.get("armed", True))
+    if mixer.isTrackArmed(track) != want:
+        mixer.armTrack(track)  # toggle
+    result = {"track": track, "armed": mixer.isTrackArmed(track)}
+    if hasattr(mixer, "getTrackRecordingFileName"):
+        result["recording_file"] = mixer.getTrackRecordingFileName(track)
+    return result
 
 
 def _channel_sample_info(p):
@@ -854,7 +873,7 @@ def _channel_sample_info(p):
     return info
 ```
 
-Enregistrer `"export_capabilities"` et `"channel_sample_info"` dans le dispatcher.
+Enregistrer `"export_capabilities"`, `"channel_sample_info"` et `"track_record_arm"` dans le dispatcher.
 
 - [ ] **Step 2: Vérification syntaxique**
 
@@ -1103,9 +1122,14 @@ bridge activé dans MIDI Settings, serveur MCP configuré dans Claude Desktop.
 
 ## Ticket 4 — Export audio
 - [ ] `fl_probe_export()` → noter quelles fonctions existent
-- [ ] Sur un channel contenant un enregistrement audio :
+      (attendu : armTrack, isTrackArmed, getTrackRecordingFileName, getTrackPeaks = true)
+- [ ] Stratégie principale — enregistrement disque :
+      armer la piste 1 via le bridge → lancer record+play → stop →
+      vérifier que `getTrackRecordingFileName` retourne un chemin et que le
+      fichier WAV existe et est lisible côté serveur
+- [ ] Stratégie secondaire — sur un channel contenant un audio :
       `fl_resolve_track_audio(0)` → chemin du fichier source
-- [ ] Si aucun chemin : valider le flux assisté (export manuel + chemin fourni)
+- [ ] Si tout échoue : valider le flux assisté (export manuel + chemin fourni)
 
 ## Résultats → décisions
 Consigner les résultats ici. Ils déterminent l'architecture définitive de
