@@ -2,17 +2,24 @@
 
 from __future__ import annotations
 
+import threading
+
 from fastmcp import FastMCP
 
 from .client import BridgeClient, BridgeUnavailable
 
 _client: BridgeClient | None = None
+_client_lock = threading.Lock()
 
 
 def get_client() -> BridgeClient:
+    # Double-checked: FastMCP runs sync tools in worker threads, so two
+    # concurrent tool calls could otherwise both construct a client.
     global _client
     if _client is None:
-        _client = BridgeClient()
+        with _client_lock:
+            if _client is None:
+                _client = BridgeClient()
     return _client
 
 
