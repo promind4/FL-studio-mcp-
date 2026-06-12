@@ -880,6 +880,22 @@ def h_plugins_set_param(p):
     }
 
 
+def h_plugins_set_params(p):
+    """Batch parameter writes: one TCP round-trip, N setParamValue calls."""
+    idx, slot, ug = _resolve_plugin_loc(p)
+    changes = p.get("changes", [])
+    applied = 0
+    errors = []
+    for change in changes:
+        try:
+            pid = int(change["index"]); v = float(change["value"])
+            plugins.setParamValue(v, pid, idx, slot, ug)
+            applied += 1
+        except Exception as exc:
+            errors.append({"index": change.get("index"), "error": str(exc)})
+    return {"applied": applied, "errors": errors}
+
+
 def h_plugins_find_param(p):
     idx, slot, ug = _resolve_plugin_loc(p)
     needle = (p.get("name_contains") or "").lower()
@@ -1575,6 +1591,7 @@ _HANDLERS = {
     "plugins.params": h_plugins_params,
     "plugins.getParam": h_plugins_get_param,
     "plugins.setParam": h_plugins_set_param,
+    "plugins.setParams": h_plugins_set_params,
     "plugins.findParam": h_plugins_find_param,
     "plugins.presetCount": h_plugins_preset_count,
     "plugins.nextPreset": h_plugins_next_preset,
