@@ -10,13 +10,13 @@ How it works
 ------------
 This script runs inside FL Studio as a "MIDI device" (no real hardware needed — it's
 loaded by configuring a virtual/loopback MIDI port or by any MIDI input that FL can
-see). On OnInit() it starts a TCP server on 127.0.0.1:9876 in a daemon thread that
+see). On OnInit() it opens a non-blocking TCP server on 127.0.0.1:9876 that
 receives length-prefixed JSON-RPC requests from the fl-studio-mcp server.
 
-Requests are placed in a thread-safe queue. FL Studio's main thread calls OnIdle()
-several times per second; each OnIdle call drains the queue and executes the pending
-FL API calls on the main thread (FL's Python API is not thread-safe, so we MUST
-execute there), then pushes responses back through the socket.
+Everything runs on FL Studio's main thread: FL 2025's Python subinterpreter
+forbids creating threads (start_new_thread returns NULL), so OnIdle() — called
+several times per second — polls the sockets (accept/recv non-blocking),
+parses complete frames, executes the FL API calls, and sends responses back.
 
 Piano-roll edits are deferred: we stage them into `piano_roll_requests.json` inside
 this script's directory, and the fl-studio-mcp server is responsible for opening the
@@ -38,7 +38,6 @@ import queue
 import socket
 import struct
 import sys
-import threading
 import time
 import traceback
 from pathlib import Path
@@ -90,9 +89,9 @@ PR_STATE = Path(SCRIPT_DIR).parent.parent / PIANO_ROLL_DIR_NAME / "fLMCP_state.j
 # ----------------------------------------------------------------------------
 
 _inbox: "queue.Queue[tuple[socket.socket, dict]]" = queue.Queue()
-_server_thread = None
 _accept_socket = None
-_client_lock = threading.Lock()
+_clients = {}  # socket -> bytearray receive buffer (incremental frame parsing)
+_shutting_down = False
 _started_at = time.monotonic()
 _idle_tick = 0
 _last_refresh_push = 0.0
@@ -115,25 +114,6 @@ def _pack_frame(obj):
     if len(body) > MAX_FRAME:
         raise ValueError("frame too large: %d" % len(body))
     return HEADER.pack(len(body)) + body
-
-
-def _recv_exact(sock, n):
-    buf = bytearray()
-    while len(buf) < n:
-        chunk = sock.recv(n - len(buf))
-        if not chunk:
-            raise ConnectionError("socket closed")
-        buf.extend(chunk)
-    return bytes(buf)
-
-
-def _read_frame(sock):
-    head = _recv_exact(sock, HEADER.size)
-    (length,) = HEADER.unpack(head)
-    if length > MAX_FRAME:
-        raise ValueError("frame length out of bounds: %d" % length)
-    body = _recv_exact(sock, length)
-    return json.loads(body.decode("utf-8"))
 
 
 def _color_to_int(color):
@@ -178,56 +158,168 @@ def _safe(fn, *a, **kw):
 
 
 # ----------------------------------------------------------------------------
-# Server thread
+# Network pump — threadless, runs entirely on FL's main thread from OnIdle.
+# FL Studio 2025's Python subinterpreter forbids creating threads
+# (start_new_thread returns NULL), so all I/O is non-blocking and polled.
 # ----------------------------------------------------------------------------
 
-def _serve_client(client):
-    _known_clients.add(client)
+def _probe_sandbox():
+    """Log which IPC channels FL 2025's Python sandbox still allows.
+
+    FL Studio 2025 runs MIDI scripts in a restricted subinterpreter: threads
+    and (apparently) sockets are blocked. This probe tells us in one restart
+    what we can build on instead (file polling, MIDI SysEx, ...)."""
     try:
-        while True:
-            try:
-                req = _read_frame(client)
-            except (ConnectionError, OSError):
-                return
-            except Exception as e:
-                try:
-                    err = {"id": 0, "ok": False, "error": "frame_error: %s" % e}
-                    client.sendall(_pack_frame(err))
-                except Exception:
-                    return
-                return
-            # hand off to the FL main thread via queue
-            _inbox.put((client, req))
-    finally:
-        _known_clients.discard(client)
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.close()
+        _log("probe socket: OK")
+    except BaseException as e:
+        _log("probe socket: BLOCKED (%s)" % e)
+    for label, path in (
+            ("home", os.path.join(os.path.expanduser("~"), "flmcp_probe.txt")),
+            ("repo", r"D:\Craft\FL studio LLM\flmcp_probe.txt")):
         try:
-            client.close()
+            with open(path, "w") as f:
+                f.write("ok")
+            os.remove(path)
+            _log("probe file write %s: OK" % label)
+        except BaseException as e:
+            _log("probe file write %s: BLOCKED (%s)" % (label, e))
+    try:
+        import subprocess
+        r = subprocess.run(["cmd", "/c", "echo flmcp"], capture_output=True,
+                           timeout=5, text=True)
+        _log("probe subprocess.run: OK (%r)" % r.stdout.strip())
+    except BaseException as e:
+        _log("probe subprocess.run: BLOCKED (%s)" % e)
+    try:
+        import ctypes
+        tick = ctypes.windll.kernel32.GetTickCount()
+        _log("probe ctypes kernel32: OK (tick=%d)" % tick)
+    except BaseException as e:
+        _log("probe ctypes kernel32: BLOCKED (%s)" % e)
+    try:
+        import ctypes
+        from ctypes import wintypes
+        k32 = ctypes.windll.kernel32
+        GENERIC_RW = 0xC0000000
+        OPEN_EXISTING = 3
+        h = k32.CreateFileW(r"\\.\pipe\flmcp_probe", GENERIC_RW, 0, None,
+                            OPEN_EXISTING, 0, None)
+        err = k32.GetLastError()
+        if h != wintypes.HANDLE(-1).value:
+            k32.CloseHandle(h)
+        # ERROR_FILE_NOT_FOUND (2) is the EXPECTED success signal here: the
+        # call reached the OS and looked for the pipe (no server is running).
+        _log("probe ctypes CreateFileW pipe: reached OS (err=%d, 2=not found=GOOD)" % err)
+    except BaseException as e:
+        _log("probe ctypes CreateFileW pipe: BLOCKED (%s)" % e)
+
+
+_bind_attempts = 0
+
+
+def _start_listening():
+    global _accept_socket, _bind_attempts
+    if _accept_socket is not None:
+        return True
+    _bind_attempts += 1
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind((BRIDGE_HOST, BRIDGE_PORT))
+        s.listen(4)
+        s.setblocking(False)
+        _accept_socket = s
+        _log("TCP server listening on %s:%d" % (BRIDGE_HOST, BRIDGE_PORT))
+        return True
+    except Exception as e:
+        _log("failed to bind bridge port: %s" % e)
+        _accept_socket = None
+        return False
+
+
+def _drop_client(sock):
+    _clients.pop(sock, None)
+    _known_clients.discard(sock)
+    try:
+        sock.close()
+    except Exception:
+        pass
+
+
+def _send_frame(sock, frame_bytes):
+    # Localhost + small frames: a short blocking send keeps the code simple
+    # without risking a partial write on the non-blocking socket.
+    try:
+        sock.settimeout(2.0)
+        sock.sendall(frame_bytes)
+        return True
+    except Exception as e:
+        _log("send failed: %s" % e)
+        _drop_client(sock)
+        return False
+    finally:
+        try:
+            sock.setblocking(False)
         except Exception:
             pass
 
 
-def _server_loop():
-    global _accept_socket
-    try:
-        _accept_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        _accept_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        _accept_socket.bind((BRIDGE_HOST, BRIDGE_PORT))
-        _accept_socket.listen(4)
-        _log("TCP server listening on %s:%d" % (BRIDGE_HOST, BRIDGE_PORT))
-    except Exception as e:
-        _log("failed to bind bridge port: %s" % e)
-        _accept_socket = None
+def _pump_network():
+    """Accept pending connections and parse incoming frames. Main thread only."""
+    if _accept_socket is None:
         return
-
     while True:
         try:
-            conn, addr = _accept_socket.accept()
-            conn.settimeout(60.0)
-            t = threading.Thread(target=_serve_client, args=(conn,), daemon=True)
-            t.start()
+            conn, _addr = _accept_socket.accept()
+        except (BlockingIOError, InterruptedError):
+            break
         except Exception as e:
             _log("accept error: %s" % e)
-            time.sleep(0.5)
+            break
+        conn.setblocking(False)
+        _clients[conn] = bytearray()
+        _known_clients.add(conn)
+
+    for sock in list(_clients.keys()):
+        buf = _clients.get(sock)
+        if buf is None:
+            continue
+        closed = False
+        while True:
+            try:
+                chunk = sock.recv(65536)
+            except (BlockingIOError, InterruptedError):
+                break
+            except Exception:
+                closed = True
+                break
+            if not chunk:
+                closed = True
+                break
+            buf.extend(chunk)
+        while True:
+            if len(buf) < HEADER.size:
+                break
+            (length,) = HEADER.unpack(bytes(buf[:HEADER.size]))
+            if length > MAX_FRAME:
+                _log("oversized frame (%d bytes); dropping client" % length)
+                closed = True
+                break
+            if len(buf) < HEADER.size + length:
+                break  # frame incomplete — wait for the next idle tick
+            body = bytes(buf[HEADER.size:HEADER.size + length])
+            del buf[:HEADER.size + length]
+            try:
+                req = json.loads(body.decode("utf-8"))
+            except Exception as e:
+                _send_frame(sock, _pack_frame(
+                    {"id": 0, "ok": False, "error": "frame_error: %s" % e}))
+                continue
+            _inbox.put((sock, req))
+        if closed:
+            _drop_client(sock)
 
 
 # ----------------------------------------------------------------------------
@@ -1748,37 +1840,42 @@ _HANDLERS = {
 # ----------------------------------------------------------------------------
 
 def OnInit():
-    global _server_thread
+    global _shutting_down
     _log("initializing — script dir: %s" % SCRIPT_DIR)
     _log("FL version: %s" % _safe(general.getVersion))
-    if _server_thread is None or not _server_thread.is_alive():
-        _server_thread = threading.Thread(target=_server_loop, daemon=True, name="fLMCP-TCP")
-        _server_thread.start()
-    _log("bridge ready on tcp://%s:%d" % (BRIDGE_HOST, BRIDGE_PORT))
+    _probe_sandbox()
+    _shutting_down = False
+    if _start_listening():
+        _log("bridge ready on tcp://%s:%d" % (BRIDGE_HOST, BRIDGE_PORT))
 
 
 def OnDeInit():
-    global _accept_socket
+    global _accept_socket, _shutting_down
     _log("deinit")
+    _shutting_down = True
     if _accept_socket is not None:
         try:
             _accept_socket.close()
         except Exception:
             pass
         _accept_socket = None
-    # close client connections
     for c in list(_known_clients):
         try:
             c.close()
         except Exception:
             pass
     _known_clients.clear()
+    _clients.clear()
 
 
 def OnIdle():
-    """Drain up to N requests per idle tick on the FL main thread."""
+    """Pump sockets then drain up to N requests, all on the FL main thread."""
     global _idle_tick, _last_refresh_push
     _idle_tick += 1
+    if (_accept_socket is None and not _shutting_down
+            and _bind_attempts < 3 and _idle_tick % 100 == 0):
+        _start_listening()  # retry bind if the port was busy at OnInit
+    _pump_network()
     drained = 0
     while drained < 32:
         try:
@@ -1796,10 +1893,7 @@ def OnIdle():
             tb = traceback.format_exc(limit=3)
             resp = {"id": req_id, "ok": False, "error": "%s: %s" % (type(e).__name__, e), "traceback": tb}
             _log("action %s error: %s" % (action, e))
-        try:
-            client.sendall(_pack_frame(resp))
-        except Exception as e:
-            _log("failed to send response: %s" % e)
+        _send_frame(client, _pack_frame(resp))
 
     # push transport notifications every ~0.5s when playing
     now = time.monotonic()
@@ -1809,10 +1903,7 @@ def OnIdle():
             snap = h_transport_status({})
             frame = _pack_frame({"event": "transport.tick", "data": snap})
             for c in list(_known_clients):
-                try:
-                    c.sendall(frame)
-                except Exception:
-                    _known_clients.discard(c)
+                _send_frame(c, frame)
         except Exception:
             pass
 
@@ -1831,10 +1922,7 @@ def OnRefresh(flags):
     try:
         frame = _pack_frame({"event": "refresh", "data": {"flags": int(flags)}})
         for c in list(_known_clients):
-            try:
-                c.sendall(frame)
-            except Exception:
-                _known_clients.discard(c)
+            _send_frame(c, frame)
     except Exception:
         pass
 
@@ -1843,9 +1931,6 @@ def OnProjectLoad(status):
     try:
         frame = _pack_frame({"event": "projectLoad", "data": {"status": status}})
         for c in list(_known_clients):
-            try:
-                c.sendall(frame)
-            except Exception:
-                _known_clients.discard(c)
+            _send_frame(c, frame)
     except Exception:
         pass

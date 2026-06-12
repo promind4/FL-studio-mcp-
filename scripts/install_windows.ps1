@@ -7,7 +7,14 @@
 
 $ErrorActionPreference = "Stop"
 
-$flSettings = Join-Path $env:USERPROFILE "Documents\Image-Line\FL Studio\Settings"
+# FL Studio stocke ses Settings hors du dossier Documents standard sur cette machine
+$flSettings = if (Test-Path "D:\Image-Line\FL Studio\Settings") {
+    "D:\Image-Line\FL Studio\Settings"
+} elseif (Test-Path (Join-Path $env:USERPROFILE "Documents\Image-Line\FL Studio\Settings")) {
+    Join-Path $env:USERPROFILE "Documents\Image-Line\FL Studio\Settings"
+} else {
+    Join-Path $env:USERPROFILE "Documents\Image-Line\FL Studio\Settings"
+}
 $target = Join-Path $flSettings "Hardware\fLMCP Bridge"
 
 if (-not (Test-Path $flSettings)) {
