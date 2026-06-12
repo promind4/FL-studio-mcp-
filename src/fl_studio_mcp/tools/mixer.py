@@ -14,6 +14,15 @@ Bridge handler facts (device_FLStudioMCP.py):
 
 from __future__ import annotations
 
+import math
+
+
+def _finite(value: float, name: str) -> float:
+    # NaN slips through max/min clamping (NaN comparisons are always False).
+    if not math.isfinite(value):
+        raise ValueError(f"{name} must be a finite number, got {value!r}")
+    return value
+
 
 def set_volume(client, track: int, volume: float) -> dict:
     """Set mixer track volume.
@@ -25,7 +34,7 @@ def set_volume(client, track: int, volume: float) -> dict:
     Returns:
         Updated track info dict from the bridge.
     """
-    volume = max(0.0, min(1.0, volume))
+    volume = max(0.0, min(1.0, _finite(volume, "volume")))
     return client.call("mixer.setVolume", {"track": track, "volume": volume})
 
 
@@ -39,7 +48,7 @@ def set_pan(client, track: int, pan: float) -> dict:
     Returns:
         Updated track info dict from the bridge.
     """
-    pan = max(-1.0, min(1.0, pan))
+    pan = max(-1.0, min(1.0, _finite(pan, "pan")))
     return client.call("mixer.setPan", {"track": track, "pan": pan})
 
 
