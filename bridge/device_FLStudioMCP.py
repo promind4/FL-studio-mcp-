@@ -642,6 +642,18 @@ def h_channels_quick_quantize(p):
     return {"ok": True}
 
 
+def h_channels_sample_info(p):
+    """Best-effort source file path of a sampler/audio channel."""
+    idx = int(p["channel"])
+    info = {"channel": idx, "name": channels.getChannelName(idx, True)}
+    if hasattr(channels, "getChannelSamplePath"):
+        info["sample_path"] = channels.getChannelSamplePath(idx)
+    else:
+        info["sample_path"] = None
+        info["hint"] = "channels.getChannelSamplePath not available in this FL build"
+    return info
+
+
 # ---- mixer -----------------------------------------------------------------
 
 def _mx_info(i):
@@ -724,6 +736,25 @@ def h_mixer_arm(p):
     tr = int(p["track"])
     mixer.armTrack(tr)
     return _mx_info(tr)
+
+
+def h_mixer_record_arm(p):
+    """Arm/disarm a mixer track for disk recording and report the target file.
+
+    Flow (orchestrated by the MCP server, which CAN read files):
+    arm -> transport record+play -> FL writes WAV -> disarm -> server reads it.
+    """
+    tr = int(p["track"])
+    want = bool(p.get("armed", True))
+    if (mixer.isTrackArmed(tr) == 1) != want:
+        mixer.armTrack(tr)  # armTrack is a toggle
+    result = {"track": tr, "armed": mixer.isTrackArmed(tr) == 1}
+    if hasattr(mixer, "getTrackRecordingFileName"):
+        result["recording_file"] = _safe(mixer.getTrackRecordingFileName, tr)
+    else:
+        result["recording_file"] = None
+        result["hint"] = "mixer.getTrackRecordingFileName not available in this FL build"
+    return result
 
 
 def h_mixer_set_name(p):
@@ -991,6 +1022,24 @@ def h_plugins_load_attempt(_):
     for fn in ("navigateBrowser", "selectBrowserMenuItem", "findBrowserItem",
                "getFocusedNodeCaption", "enterBrowserMenu", "previewBrowserMenuItem"):
         report["ui.%s" % fn] = hasattr(ui, fn)
+    return {"strategies": report}
+
+
+# ---- export ----------------------------------------------------------------
+
+def h_export_capabilities(_):
+    """Probe runtime API for render/export and disk-recording entry points.
+
+    project render is not scriptable in FL's public API; per-mixer-track disk
+    recording (armTrack + getTrackRecordingFileName) is the primary strategy."""
+    report = {}
+    for mod, fn in ((transport, "render"), (general, "renderProject"),
+                    (mixer, "saveAudio"), (ui, "exportAudio"),
+                    (mixer, "armTrack"), (mixer, "isTrackArmed"),
+                    (mixer, "getTrackRecordingFileName"),
+                    (mixer, "getTrackPeaks"),
+                    (channels, "getChannelSamplePath")):
+        report["%s.%s" % (mod.__name__, fn)] = hasattr(mod, fn)
     return {"strategies": report}
 
 
@@ -1594,6 +1643,7 @@ _HANDLERS = {
     "channels.setStepSequence": h_channels_set_step_sequence,
     "channels.clearStepSequence": h_channels_clear_step_sequence,
     "channels.quickQuantize": h_channels_quick_quantize,
+    "channels.sampleInfo": h_channels_sample_info,
     # mixer
     "mixer.count": h_mixer_count,
     "mixer.trackInfo": h_mixer_track_info,
@@ -1603,6 +1653,7 @@ _HANDLERS = {
     "mixer.mute": h_mixer_mute,
     "mixer.solo": h_mixer_solo,
     "mixer.arm": h_mixer_arm,
+    "mixer.recordArm": h_mixer_record_arm,
     "mixer.setName": h_mixer_set_name,
     "mixer.setColor": h_mixer_set_color,
     "mixer.setStereoSep": h_mixer_set_stereo_sep,
@@ -1629,6 +1680,8 @@ _HANDLERS = {
     "plugins.showEditor": h_plugins_show_editor,
     "plugins.listMixerTrack": h_plugins_list_mixer_track,
     "plugins.loadAttempt": h_plugins_load_attempt,
+    # export
+    "export.capabilities": h_export_capabilities,
     # playlist
     "playlist.trackCount": h_playlist_count,
     "playlist.trackInfo": h_playlist_track_info,
