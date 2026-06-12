@@ -60,12 +60,12 @@ class BridgeClient:
                     raise BridgeUnavailable(
                         f"bridge did not respond within {self.timeout}s"
                     ) from exc
-                except (ConnectionError, OSError):
+                except (ConnectionError, OSError) as exc:
                     self._drop()
                     if attempt == 2:
                         raise BridgeUnavailable(
                             "connection lost and reconnect failed"
-                        )
+                        ) from exc
             # Unreachable — the loop always returns or raises, but satisfies
             # type-checkers that don't recognise the exhaustive loop above.
             raise BridgeUnavailable("unexpected call() exit")  # pragma: no cover
