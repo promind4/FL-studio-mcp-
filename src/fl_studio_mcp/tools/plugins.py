@@ -52,11 +52,35 @@ def discover_params(
     if cache_file.exists():
         return json.loads(cache_file.read_text(encoding="utf-8"))
 
-    params = client.call("plugins.params", {
-        "index": track,
-        "slot": slot,
-        "location": location,
-    })
+    PAGE_SIZE = 128
+    all_params: list = []
+    total: int | None = None
+    offset = 0
+
+    while True:
+        page = client.call("plugins.params", {
+            "index": track,
+            "slot": slot,
+            "location": location,
+            "limit": PAGE_SIZE,
+            "offset": offset,
+        })
+        if total is None:
+            total = page["total"]
+        all_params.extend(page["params"])
+
+        if len(all_params) >= total:
+            break
+
+        if len(page["params"]) == 0:
+            raise RuntimeError(
+                f"plugins.params pagination stalled: collected {len(all_params)}/{total} "
+                f"params but the bridge returned an empty page at offset {offset}."
+            )
+
+        offset += len(page["params"])
+
+    params = {"total": total, "params": all_params}
     schema = {"plugin": plugin_name, "params": params}
 
     cache_file.parent.mkdir(parents=True, exist_ok=True)

@@ -19,7 +19,13 @@ from fl_studio_mcp.tools.plugins import discover_params, set_params, get_param
 
 
 class FakeClient:
-    """Records calls and returns pre-configured responses."""
+    """Records calls and returns pre-configured responses.
+
+    Each value in *responses* may be:
+    - a plain dict  → returned as-is every time
+    - a callable    → called with the params dict; its return value is used
+    - a list        → items consumed in order (one per call); raises if exhausted
+    """
 
     def __init__(self, responses: dict):
         self.responses = responses
@@ -29,7 +35,16 @@ class FakeClient:
         self.calls.append((action, params))
         if action not in self.responses:
             raise KeyError(f"FakeClient: no response configured for action {action!r}")
-        return self.responses[action]
+        handler = self.responses[action]
+        if callable(handler):
+            return handler(params)
+        if isinstance(handler, list):
+            if not handler:
+                raise IndexError(
+                    f"FakeClient: response list for {action!r} is exhausted"
+                )
+            return handler.pop(0)
+        return handler
 
 
 # ---------------------------------------------------------------------------
@@ -41,9 +56,16 @@ def test_discover_params_builds_schema(tmp_path):
         {"idx": 0, "name": "Cutoff", "value": 0.5, "value_string": "50%"},
         {"idx": 1, "name": "Resonance", "value": 0.3, "value_string": "30%"},
     ]
+
+    def params_handler(p):
+        offset = p.get("offset", 0)
+        limit = p.get("limit", 128)
+        page = fake_params[offset: offset + limit]
+        return {"total": len(fake_params), "params": page}
+
     client = FakeClient({
         "plugins.name": {"name": "Serum"},
-        "plugins.params": {"total": 2, "params": fake_params},
+        "plugins.params": params_handler,
     })
 
     schema = discover_params(client, track=1, slot=0, cache_dir=tmp_path)
@@ -59,6 +81,12 @@ def test_discover_params_builds_schema(tmp_path):
     name_params = next(p for a, p in client.calls if a == "plugins.name")
     assert name_params["index"] == 1
     assert name_params["slot"] == 0
+
+    # The single paginated call must carry limit and offset
+    params_calls = [(a, p) for a, p in client.calls if a == "plugins.params"]
+    assert len(params_calls) == 1
+    assert params_calls[0][1]["limit"] == 128
+    assert params_calls[0][1]["offset"] == 0
 
     # Cache file must exist and contain the schema
     cache_file = tmp_path / "Serum.json"
@@ -152,10 +180,9 @@ def test_get_param_returns_value():
 
 def test_discover_params_sanitises_plugin_name(tmp_path):
     """Plugin names containing path-illegal chars must not crash on Windows."""
-    fake_params: list = []
     client = FakeClient({
         "plugins.name": {"name": 'Vst<Plugin>: "Weird/Name"'},
-        "plugins.params": {"total": 0, "params": fake_params},
+        "plugins.params": {"total": 0, "params": []},
     })
 
     schema = discover_params(client, track=0, slot=0, cache_dir=tmp_path)
@@ -164,3 +191,79 @@ def test_discover_params_sanitises_plugin_name(tmp_path):
     # The cache file must exist (name sanitised) — just one file created
     cache_files = list(tmp_path.iterdir())
     assert len(cache_files) == 1
+
+
+# ---------------------------------------------------------------------------
+# Test 6: discover_params paginates large plugins (>128 params)
+# ---------------------------------------------------------------------------
+
+def test_discover_params_paginates_large_plugins(tmp_path):
+    """A plugin with 300 params must trigger 3 bridge calls with correct offsets."""
+    TOTAL = 300
+
+    def make_param(i):
+        return {"idx": i, "name": f"Param{i}", "value": 0.0, "value_string": "0%"}
+
+    all_plugin_params = [make_param(i) for i in range(TOTAL)]
+
+    def params_handler(p):
+        offset = p.get("offset", 0)
+        limit = p.get("limit", 128)
+        page = all_plugin_params[offset: offset + limit]
+        return {"total": TOTAL, "params": page}
+
+    client = FakeClient({
+        "plugins.name": {"name": "FabFilter Pro-Q 3"},
+        "plugins.params": params_handler,
+    })
+
+    schema = discover_params(client, track=0, slot=0, cache_dir=tmp_path)
+
+    # Full schema must have all 300 params
+    assert schema["plugin"] == "FabFilter Pro-Q 3"
+    assert schema["params"]["total"] == TOTAL
+    assert len(schema["params"]["params"]) == TOTAL
+    assert schema["params"]["params"] == all_plugin_params
+
+    # Must have made exactly 3 calls to plugins.params (128 + 128 + 44)
+    params_calls = [(a, p) for a, p in client.calls if a == "plugins.params"]
+    assert len(params_calls) == 3, (
+        f"Expected 3 paginated calls, got {len(params_calls)}"
+    )
+
+    # Verify offsets: 0, 128, 256
+    offsets = [p["offset"] for _, p in params_calls]
+    assert offsets == [0, 128, 256], f"Unexpected offsets: {offsets}"
+
+    # Verify limit was always 128
+    limits = [p["limit"] for _, p in params_calls]
+    assert all(lim == 128 for lim in limits), f"Unexpected limits: {limits}"
+
+    # Cache must be written with the full schema
+    cache_file = tmp_path / "FabFilter Pro-Q 3.json"
+    assert cache_file.exists()
+    cached = json.loads(cache_file.read_text(encoding="utf-8"))
+    assert cached == schema
+
+
+# ---------------------------------------------------------------------------
+# Test 7: discover_params raises RuntimeError on stalled pagination
+# ---------------------------------------------------------------------------
+
+def test_discover_params_raises_on_stalled_pagination(tmp_path):
+    """If the bridge returns an empty page before total is reached, raise RuntimeError."""
+
+    def stalled_handler(p):
+        offset = p.get("offset", 0)
+        if offset == 0:
+            return {"total": 300, "params": [{"idx": i, "name": f"P{i}", "value": 0.0, "value_string": "0%"} for i in range(128)]}
+        # Simulate a broken bridge that returns nothing on the second page
+        return {"total": 300, "params": []}
+
+    client = FakeClient({
+        "plugins.name": {"name": "BrokenPlugin"},
+        "plugins.params": stalled_handler,
+    })
+
+    with pytest.raises(RuntimeError, match="stalled"):
+        discover_params(client, track=0, slot=0, cache_dir=tmp_path)
