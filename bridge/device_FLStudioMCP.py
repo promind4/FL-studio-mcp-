@@ -981,6 +981,19 @@ def h_plugins_list_mixer_track(p):
     return {"slots": out}
 
 
+def h_plugins_load_attempt(_):
+    """Probe runtime API for plugin-loading capabilities (FL 2025 may
+    expose more than the public stubs)."""
+    report = {}
+    for mod, fn in ((mixer, "loadPlugin"), (plugins, "load"),
+                    (channels, "addChannel"), (mixer, "trackPluginLoad")):
+        report["%s.%s" % (mod.__name__, fn)] = hasattr(mod, fn)
+    for fn in ("navigateBrowser", "selectBrowserMenuItem", "findBrowserItem",
+               "getFocusedNodeCaption", "enterBrowserMenu", "previewBrowserMenuItem"):
+        report["ui.%s" % fn] = hasattr(ui, fn)
+    return {"strategies": report}
+
+
 # ---- playlist --------------------------------------------------------------
 
 def _pl_info(i):
@@ -1615,6 +1628,7 @@ _HANDLERS = {
     "plugins.setPreset": h_plugins_set_preset,
     "plugins.showEditor": h_plugins_show_editor,
     "plugins.listMixerTrack": h_plugins_list_mixer_track,
+    "plugins.loadAttempt": h_plugins_load_attempt,
     # playlist
     "playlist.trackCount": h_playlist_count,
     "playlist.trackInfo": h_playlist_track_info,
