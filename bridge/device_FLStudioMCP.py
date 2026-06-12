@@ -880,19 +880,35 @@ def h_plugins_set_param(p):
     }
 
 
+MAX_BATCH_CHANGES = 128
+
+
 def h_plugins_set_params(p):
-    """Batch parameter writes: one TCP round-trip, N setParamValue calls."""
-    idx, slot, ug = _resolve_plugin_loc(p)
+    """Batch parameter writes: one TCP round-trip, N setParamValue calls.
+
+    Applies up to MAX_BATCH_CHANGES (128) changes per call; excess changes are
+    dropped and a truncation error entry is appended to the response.
+    This path does not read back values after writing — callers needing
+    confirmed values should follow up with plugins.getParam.
+    """
+    try:
+        idx, slot, ug = _resolve_plugin_loc(p)
+    except Exception as exc:
+        return {"applied": 0, "errors": [{"pos": None, "index": None, "error": "invalid location: " + str(exc)}]}
     changes = p.get("changes", [])
     applied = 0
     errors = []
-    for change in changes:
+    truncated = len(changes) > MAX_BATCH_CHANGES
+    work = changes[:MAX_BATCH_CHANGES]
+    for i, change in enumerate(work):
         try:
             pid = int(change["index"]); v = float(change["value"])
             plugins.setParamValue(v, pid, idx, slot, ug)
             applied += 1
         except Exception as exc:
-            errors.append({"index": change.get("index"), "error": str(exc)})
+            errors.append({"pos": i, "index": change.get("index"), "error": str(exc)})
+    if truncated:
+        errors.append({"pos": None, "index": None, "error": "batch truncated to 128 changes (got %d)" % len(changes)})
     return {"applied": applied, "errors": errors}
 
 
