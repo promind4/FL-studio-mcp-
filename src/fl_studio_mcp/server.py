@@ -154,6 +154,63 @@ def build_server() -> FastMCP:
         Insert tracks; pass include_empty=True to list everything."""
         return mixer.list_tracks(get_client(), include_empty)
 
+    # --- Plugin slot management --------------------------------------------
+
+    @mcp.tool()
+    def fl_set_slot_enabled(track: int, slot: int, enabled: bool,
+                             location: str = "mixer") -> dict:
+        """Enable (True) or bypass/disable (False) an FX slot green button.
+        location: 'mixer' (default) for FX chain plugins."""
+        return get_client().call("plugins.setSlotEnabled", {
+            "index": track, "slot": slot, "location": location,
+            "enabled": enabled,
+        })
+
+    @mcp.tool()
+    def fl_remove_plugin(track: int, slot: int) -> dict:
+        """Remove the plugin loaded in an FX slot (clears the slot).
+        track: mixer track index. slot: FX chain slot 0-9."""
+        return get_client().call("plugins.removeFromSlot", {
+            "index": track, "slot": slot, "location": "mixer",
+        })
+
+    @mcp.tool()
+    def fl_set_sidechain(src_track: int, dst_track: int,
+                          enabled: bool = True, level: float = 1.0) -> dict:
+        """Create or remove a send/sidechain route from src_track to dst_track.
+        level: send level 0.0 (-INF) to 1.0 (0 dB / unity, default)."""
+        return get_client().call("mixer.sidechain", {
+            "src_track": src_track, "dst_track": dst_track,
+            "enabled": enabled, "level": level,
+        })
+
+    @mcp.tool()
+    def fl_get_route_info(src_track: int, dst_track: int) -> dict:
+        """Check if a send/sidechain route is active between two tracks
+        and read its current send level."""
+        return get_client().call("mixer.getRouteInfo", {
+            "src_track": src_track, "dst_track": dst_track,
+        })
+
+    @mcp.tool()
+    def fl_get_slot_info(track: int, slot: int) -> dict:
+        """Get plugin name + enabled/bypass state for one FX slot."""
+        return get_client().call("plugins.getSlotInfo", {
+            "index": track, "slot": slot,
+        })
+
+    @mcp.tool()
+    def fl_get_track_peaks(track: int) -> dict:
+        """Read current audio peak levels (left + right) for a mixer track.
+        Returns normalised 0.0..1.0. Only works if FL Studio exposes the API."""
+        return get_client().call("mixer.getPeaks", {"track": track})
+
+    @mcp.tool()
+    def fl_get_full_track_info(track: int) -> dict:
+        """Extended track snapshot: volume, pan, mute/solo, all FX slots with
+        enabled state, and peak levels — all in one round-trip."""
+        return get_client().call("mixer.fullTrackInfo", {"track": track})
+
     # --- Plugin loading -----------------------------------------------------
 
     @mcp.tool()

@@ -1199,6 +1199,229 @@ def h_plugins_load_attempt(_):
     return {"strategies": report}
 
 
+def h_plugins_probe_api(_):
+    """Return all callable attributes of the plugins module — used to
+    discover undocumented enable/disable/remove functions at runtime."""
+    attrs = {}
+    for name in dir(plugins):
+        if name.startswith("_"):
+            continue
+        try:
+            obj = getattr(plugins, name)
+            attrs[name] = callable(obj)
+        except Exception:
+            pass
+    return {"attrs": attrs}
+
+
+def h_plugins_set_slot_enabled(p):
+    """Enable (True) or bypass (False) one FX slot green button.
+
+    Strategy 1 — plugins.isEnabled / setEnabled (FL 2025 may expose this).
+    Strategy 2 — mixer slot param index 0 controls bypass in some builds.
+    Returns {"ok": bool, "enabled": bool, "strategy": str}.
+    """
+    idx, slot, ug = _resolve_plugin_loc(p)
+    enabled = bool(p.get("enabled", True))
+
+    # Strategy 1: explicit setEnabled API (not always present)
+    if hasattr(plugins, "setEnabled"):
+        try:
+            plugins.setEnabled(idx, slot, 1 if enabled else 0, ug)
+            actual = bool(plugins.isEnabled(idx, slot, ug)) if hasattr(plugins, "isEnabled") else enabled
+            return {"ok": True, "enabled": actual, "strategy": "plugins.setEnabled"}
+        except Exception as e:
+            pass  # fall through
+
+    # Strategy 2: FL stores bypass state as a special param at index -1 or 0
+    # Some builds expose it via setParamValue with pid=-1
+    for pid in (-1, 0):
+        try:
+            plugins.setParamValue(1.0 if enabled else 0.0, pid, idx, slot, ug)
+            return {"ok": True, "enabled": enabled, "strategy": "setParamValue(pid=%d)" % pid}
+        except Exception:
+            pass
+
+    return {"ok": False, "enabled": None,
+            "error": "no enable/disable API found — check plugins.probeApi"}
+
+
+def h_plugins_remove_from_slot(p):
+    """Remove the plugin loaded in a mixer FX slot.
+
+    Strategy 1 — mixer.removeTrackPlugin (FL 2025).
+    Strategy 2 — set plugin ID to 0 via mixer internals.
+    Returns {"ok": bool, "strategy": str}.
+    """
+    track = int(p["index"])
+    slot = int(p.get("slot", 0))
+
+    # Strategy 1: dedicated remove function
+    if hasattr(mixer, "removeTrackPlugin"):
+        try:
+            mixer.removeTrackPlugin(track, slot)
+            return {"ok": True, "strategy": "mixer.removeTrackPlugin"}
+        except Exception as e:
+            pass
+
+    # Strategy 2: set slot plugin ID to 0 — clears the slot in some builds
+    if hasattr(mixer, "setTrackPluginId"):
+        try:
+            mixer.setTrackPluginId(track, slot, 0)
+            return {"ok": True, "strategy": "mixer.setTrackPluginId(0)"}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    return {"ok": False, "error": "no plugin removal API found"}
+
+
+# ---- sidechain / send routing ----------------------------------------------
+
+def h_mixer_sidechain(p):
+    """Configure a send/sidechain route between two mixer tracks.
+
+    Sets the route from src_track → dst_track enabled, optionally
+    controlling the send level (0.0 = -INF, 1.0 = 0 dB / unity).
+
+    Args:
+        src_track: source track index
+        dst_track: destination track index
+        enabled: True (default) to activate route
+        level: send level 0.0..1.0 (default 1.0)
+    """
+    src = int(p["src_track"])
+    dst = int(p["dst_track"])
+    enabled = bool(p.get("enabled", True))
+    level = float(p.get("level", 1.0))
+
+    mixer.setRouteTo(src, dst, enabled, False)
+    mixer.afterRoutingChanged()
+
+    if enabled and hasattr(mixer, "setRouteToLevel"):
+        try:
+            mixer.setRouteToLevel(src, dst, level)
+        except Exception:
+            pass
+
+    active = None
+    if hasattr(mixer, "getRouteSendActive"):
+        try:
+            active = bool(mixer.getRouteSendActive(src, dst))
+        except Exception:
+            pass
+
+    actual_level = level
+    if enabled and hasattr(mixer, "getRouteToLevel"):
+        try:
+            actual_level = mixer.getRouteToLevel(src, dst)
+        except Exception:
+            pass
+
+    return {"src": src, "dst": dst, "enabled": enabled,
+            "active": active, "level": actual_level}
+
+
+def h_mixer_get_route_info(p):
+    """Read the routing / send state between two mixer tracks.
+
+    Returns whether the route is active and its current send level.
+    """
+    src = int(p["src_track"])
+    dst = int(p["dst_track"])
+    active = None
+    level = None
+    if hasattr(mixer, "getRouteSendActive"):
+        try:
+            active = bool(mixer.getRouteSendActive(src, dst))
+        except Exception:
+            pass
+    if hasattr(mixer, "getRouteToLevel"):
+        try:
+            level = mixer.getRouteToLevel(src, dst)
+        except Exception:
+            pass
+    return {"src": src, "dst": dst, "active": active, "level": level}
+
+
+def h_plugins_get_slot_info(p):
+    """Return enabled state + name for one FX slot (single round-trip).
+
+    Combines plugins.isValid, plugins.isEnabled and plugins.getPluginName.
+    """
+    track = int(p["index"])
+    slot = int(p.get("slot", 0))
+    valid = bool(plugins.isValid(track, slot, False) == 1)
+    name = plugins.getPluginName(track, slot, 0, False) if valid else None
+    enabled = None
+    if valid:
+        if hasattr(plugins, "isEnabled"):
+            try:
+                enabled = bool(plugins.isEnabled(track, slot, False))
+            except Exception:
+                pass
+        if enabled is None:
+            enabled = True  # assume enabled if API doesn't expose it
+    return {"track": track, "slot": slot, "valid": valid,
+            "name": name, "enabled": enabled}
+
+
+def h_mixer_get_peaks(p):
+    """Read audio peak levels for a mixer track (left + right channels).
+
+    Returns normalised 0.0..1.0 values. Only available in FL builds that
+    expose mixer.getTrackPeaks; returns null when not supported.
+    """
+    track = int(p["track"])
+    mode = int(p.get("mode", 0))  # 0=peak, 1=RMS (if supported)
+    if hasattr(mixer, "getTrackPeaks"):
+        try:
+            left = mixer.getTrackPeaks(track, 0)
+            right = mixer.getTrackPeaks(track, 1)
+            return {"track": track, "left": left, "right": right, "supported": True}
+        except Exception as e:
+            return {"track": track, "left": None, "right": None,
+                    "supported": False, "error": str(e)}
+    return {"track": track, "left": None, "right": None, "supported": False,
+            "error": "mixer.getTrackPeaks not available in this FL build"}
+
+
+def h_mixer_full_track_info(p):
+    """Extended track info: volume, pan, mute, solo, FX slots with enabled
+    state, and current peak levels — all in one round-trip."""
+    track = int(p["track"])
+    name = mixer.getTrackName(track)
+    volume = mixer.getTrackVolume(track)
+    pan = mixer.getTrackPan(track)
+    muted = bool(mixer.isTrackMuted(track))
+    solo = bool(mixer.isTrackSolo(track)) if hasattr(mixer, "isTrackSolo") else False
+
+    slots = []
+    for s in range(10):
+        try:
+            valid = bool(plugins.isValid(track, s, False) == 1)
+            name_s = plugins.getPluginName(track, s, 0, False) if valid else None
+            enabled = None
+            if valid and hasattr(plugins, "isEnabled"):
+                try:
+                    enabled = bool(plugins.isEnabled(track, s, False))
+                except Exception:
+                    enabled = True
+            slots.append({"slot": s, "valid": valid, "name": name_s, "enabled": enabled})
+        except Exception:
+            slots.append({"slot": s, "valid": False, "name": None, "enabled": None})
+
+    peaks = {}
+    if hasattr(mixer, "getTrackPeaks"):
+        try:
+            peaks = {"left": mixer.getTrackPeaks(track, 0),
+                     "right": mixer.getTrackPeaks(track, 1)}
+        except Exception:
+            pass
+
+    return {"track": track, "name": name, "volume": volume, "pan": pan,
+            "muted": muted, "solo": solo, "fx_slots": slots, "peaks": peaks}
+
+
 # ---- export ----------------------------------------------------------------
 
 def h_export_capabilities(_):
@@ -1854,6 +2077,15 @@ _HANDLERS = {
     "plugins.showEditor": h_plugins_show_editor,
     "plugins.listMixerTrack": h_plugins_list_mixer_track,
     "plugins.loadAttempt": h_plugins_load_attempt,
+    "plugins.probeApi": h_plugins_probe_api,
+    "plugins.setSlotEnabled": h_plugins_set_slot_enabled,
+    "plugins.removeFromSlot": h_plugins_remove_from_slot,
+    "plugins.getSlotInfo": h_plugins_get_slot_info,
+    # sidechain / routing
+    "mixer.sidechain": h_mixer_sidechain,
+    "mixer.getRouteInfo": h_mixer_get_route_info,
+    "mixer.getPeaks": h_mixer_get_peaks,
+    "mixer.fullTrackInfo": h_mixer_full_track_info,
     # export
     "export.capabilities": h_export_capabilities,
     # playlist
