@@ -32,6 +32,7 @@ Response:     {"id": int, "ok": bool, "result": ..., "error": str|None}
 Notification: {"event": str, "data": ...}   (server push, no id)
 """
 
+import base64
 import json
 import os
 import queue
@@ -88,7 +89,9 @@ PR_STATE = Path(SCRIPT_DIR).parent.parent / PIANO_ROLL_DIR_NAME / "fLMCP_state.j
 # Global state
 # ----------------------------------------------------------------------------
 
-_inbox: "queue.Queue[tuple[socket.socket, dict]]" = queue.Queue()
+# Inbox entries are (origin, request): origin is a client socket for the TCP
+# transport, or None for requests that arrived over MIDI SysEx.
+_inbox: "queue.Queue[tuple[object, dict]]" = queue.Queue()
 _accept_socket = None
 _clients = {}  # socket -> bytearray receive buffer (incremental frame parsing)
 _shutting_down = False
@@ -96,6 +99,8 @@ _started_at = time.monotonic()
 _idle_tick = 0
 _last_refresh_push = 0.0
 _known_clients = set()  # live client sockets for push notifications
+_midi_active = False  # True once a SysEx request arrived (enables MIDI pushes)
+_sysex_rx = []  # base64 ASCII chunks of the message currently being received
 
 
 # ----------------------------------------------------------------------------
@@ -320,6 +325,83 @@ def _pump_network():
             _inbox.put((sock, req))
         if closed:
             _drop_client(sock)
+
+
+# ----------------------------------------------------------------------------
+# MIDI SysEx transport — the only channel FL Studio 2025's sandbox leaves open.
+#
+# A JSON message is base64-encoded (pure ASCII, so every byte is SysEx-safe
+# 7-bit data) and sliced into chunks. Each chunk travels as:
+#   F0 7D 46 4C <flags> <seq_lo> <seq_hi> <base64 slice> F7
+# 0x7D is the MIDI "non-commercial / educational" manufacturer id; 46 4C is
+# "FL". flags bit0 marks the final chunk. seq is a 14-bit chunk counter.
+# The server side (midi_transport.py) implements the same codec over loopMIDI.
+# ----------------------------------------------------------------------------
+
+SYSEX_MAGIC = (0x7D, 0x46, 0x4C)
+SYSEX_CHUNK = 512  # base64 chars per SysEx frame
+
+
+def _sysex_encode(obj):
+    """JSON message -> list of complete SysEx frames (bytes, F0..F7)."""
+    payload = base64.b64encode(
+        json.dumps(obj, separators=(",", ":"), ensure_ascii=False).encode("utf-8"))
+    frames = []
+    nchunks = max(1, (len(payload) + SYSEX_CHUNK - 1) // SYSEX_CHUNK)
+    for i in range(nchunks):
+        chunk = payload[i * SYSEX_CHUNK:(i + 1) * SYSEX_CHUNK]
+        flags = 0x01 if i == nchunks - 1 else 0x00
+        frames.append(bytes((0xF0,) + SYSEX_MAGIC
+                            + (flags, i & 0x7F, (i >> 7) & 0x7F))
+                      + chunk + bytes((0xF7,)))
+    return frames
+
+
+def _midi_send_message(obj):
+    """Send a JSON message to the MCP server over the linked MIDI output."""
+    if not hasattr(device, "midiOutSysex"):
+        _log("device.midiOutSysex not available in this FL build")
+        return False
+    try:
+        for frame in _sysex_encode(obj):
+            device.midiOutSysex(frame)
+        return True
+    except Exception as e:
+        _log("midi send failed: %s" % e)
+        return False
+
+
+def _on_sysex_bytes(data):
+    """Handle one received SysEx frame.
+
+    Tolerates both F0-prefixed (full frame) and bare-payload forms because
+    FL Studio 2025 passes event.sysex without the F0/F7 framing bytes.
+    """
+    global _midi_active, _sysex_rx
+    data = bytes(data)
+    # Strip F0 / F7 framing if present so we work with bare payload.
+    if data and data[0] == 0xF0:
+        data = data[1:]
+    if data and data[-1] == 0xF7:
+        data = data[:-1]
+    # Bare payload: MAGIC(3) flags(1) seq_lo(1) seq_hi(1) base64(...)
+    if len(data) < 7 or tuple(data[0:3]) != SYSEX_MAGIC:
+        return False  # not ours
+    flags = data[3]
+    payload = bytes(data[6:])
+    _sysex_rx.append(payload)
+    if not (flags & 0x01):
+        return True  # more chunks coming
+    blob = b"".join(_sysex_rx)
+    _sysex_rx = []
+    try:
+        req = json.loads(base64.b64decode(blob).decode("utf-8"))
+    except Exception as e:
+        _midi_send_message({"id": 0, "ok": False, "error": "frame_error: %s" % e})
+        return True
+    _midi_active = True
+    _inbox.put((None, req))
+    return True
 
 
 # ----------------------------------------------------------------------------
@@ -1847,6 +1929,10 @@ def OnInit():
     _shutting_down = False
     if _start_listening():
         _log("bridge ready on tcp://%s:%d" % (BRIDGE_HOST, BRIDGE_PORT))
+    else:
+        _log("TCP unavailable (FL 2025 sandbox) — MIDI SysEx transport active. "
+             "Route a loopMIDI port to this controller's input AND set the "
+             "same port number on a loopMIDI output device.")
 
 
 def OnDeInit():
@@ -1893,23 +1979,48 @@ def OnIdle():
             tb = traceback.format_exc(limit=3)
             resp = {"id": req_id, "ok": False, "error": "%s: %s" % (type(e).__name__, e), "traceback": tb}
             _log("action %s error: %s" % (action, e))
-        _send_frame(client, _pack_frame(resp))
+        if client is None:  # request arrived over MIDI SysEx
+            _midi_send_message(resp)
+        else:
+            _send_frame(client, _pack_frame(resp))
 
     # push transport notifications every ~0.5s when playing
     now = time.monotonic()
-    if _known_clients and (now - _last_refresh_push) > 0.5:
+    if (_known_clients or _midi_active) and (now - _last_refresh_push) > 0.5:
         _last_refresh_push = now
         try:
             snap = h_transport_status({})
-            frame = _pack_frame({"event": "transport.tick", "data": snap})
-            for c in list(_known_clients):
-                _send_frame(c, frame)
+            event = {"event": "transport.tick", "data": snap}
+            if _known_clients:
+                frame = _pack_frame(event)
+                for c in list(_known_clients):
+                    _send_frame(c, frame)
+            if _midi_active:
+                _midi_send_message(event)
         except Exception:
             pass
 
 
+def OnSysEx(event):
+    """SysEx from the MCP server (via loopMIDI)."""
+    try:
+        if _on_sysex_bytes(bytes(event.sysex)):
+            event.handled = True
+            return
+    except Exception as e:
+        _log("OnSysEx error: %s" % e)
+    event.handled = False
+
+
 def OnMidiIn(event):
-    # We don't need MIDI for the primary channel; just ignore.
+    # Some FL builds route SysEx through OnMidiIn instead of OnSysEx.
+    try:
+        sysex = getattr(event, "sysex", None)
+        if sysex and _on_sysex_bytes(bytes(sysex)):
+            event.handled = True
+            return
+    except Exception as e:
+        _log("OnMidiIn sysex error: %s" % e)
     event.handled = False
 
 
@@ -1920,17 +2031,23 @@ def OnMidiMsg(event):
 def OnRefresh(flags):
     # push a refresh event to connected clients (so MCP server can invalidate cache)
     try:
-        frame = _pack_frame({"event": "refresh", "data": {"flags": int(flags)}})
+        event = {"event": "refresh", "data": {"flags": int(flags)}}
+        frame = _pack_frame(event)
         for c in list(_known_clients):
             _send_frame(c, frame)
+        if _midi_active:
+            _midi_send_message(event)
     except Exception:
         pass
 
 
 def OnProjectLoad(status):
     try:
-        frame = _pack_frame({"event": "projectLoad", "data": {"status": status}})
+        event = {"event": "projectLoad", "data": {"status": status}}
+        frame = _pack_frame(event)
         for c in list(_known_clients):
             _send_frame(c, frame)
+        if _midi_active:
+            _midi_send_message(event)
     except Exception:
         pass

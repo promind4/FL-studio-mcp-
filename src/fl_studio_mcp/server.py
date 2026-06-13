@@ -2,24 +2,50 @@
 
 from __future__ import annotations
 
+import os
+import socket
 import threading
 
 from fastmcp import FastMCP
 
+from . import protocol
 from .client import BridgeClient, BridgeUnavailable
 
-_client: BridgeClient | None = None
+_client = None
 _client_lock = threading.Lock()
 
 
-def get_client() -> BridgeClient:
+def _make_client():
+    """Pick the bridge transport.
+
+    FLMCP_TRANSPORT=tcp|midi forces one; default "auto" uses TCP when the
+    bridge port answers (FL builds that allow sockets) and falls back to
+    MIDI SysEx via loopMIDI (FL Studio 2025, whose sandbox blocks sockets).
+    """
+    transport = os.environ.get("FLMCP_TRANSPORT", "auto").lower()
+    if transport == "midi":
+        from .midi_transport import MidiBridgeClient
+        return MidiBridgeClient()
+    if transport == "tcp":
+        return BridgeClient()
+    try:
+        probe = socket.create_connection((protocol.HOST, protocol.PORT),
+                                         timeout=0.5)
+        probe.close()
+        return BridgeClient()
+    except OSError:
+        from .midi_transport import MidiBridgeClient
+        return MidiBridgeClient()
+
+
+def get_client():
     # Double-checked: FastMCP runs sync tools in worker threads, so two
     # concurrent tool calls could otherwise both construct a client.
     global _client
     if _client is None:
         with _client_lock:
             if _client is None:
-                _client = BridgeClient()
+                _client = _make_client()
     return _client
 
 
