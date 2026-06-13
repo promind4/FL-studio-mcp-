@@ -66,26 +66,57 @@ def build_server() -> FastMCP:
         except BridgeUnavailable as exc:
             return {"connected": False, "error": str(exc)}
 
+    # --- Plugin browser ---------------------------------------------------
+
+    @mcp.tool()
+    def fl_list_available_plugins() -> dict:
+        """List all plugins installed in FL Studio's plugin database.
+
+        Reads the on-disk database (no FL Studio round-trip required).
+        Returns name, type (effect/generator) and format (fruity/vst/vst3)
+        for every installed plugin.
+
+        Example result:
+          {"total": 243, "plugins": [
+            {"name": "Pro-Q 3", "type": "effect", "format": "vst3"},
+            {"name": "Serum", "type": "generator", "format": "vst"},
+            ...
+          ]}
+        """
+        return plugin_tools.list_available_plugins()
+
     # --- Plugin parameters ------------------------------------------------
 
     @mcp.tool()
-    def fl_discover_plugin_params(track: int, slot: int) -> dict:
+    def fl_discover_plugin_params(track: int, slot: int,
+                                   location: str = "mixer") -> dict:
         """Full parameter map (index, name, value) of the plugin at
         (track, slot). Cached per plugin name, so the first call on a big
-        plugin is slow but repeats are instant."""
-        return plugin_tools.discover_params(get_client(), track, slot)
+        plugin is slow but repeats are instant.
+        location: "mixer" (default) for FX chain plugins, "channel" for
+        channel-rack instruments."""
+        return plugin_tools.discover_params(get_client(), track, slot,
+                                            location=location)
 
     @mcp.tool()
-    def fl_set_plugin_params(track: int, slot: int, changes: list[dict]) -> dict:
+    def fl_set_plugin_params(track: int, slot: int, changes: list[dict],
+                              location: str = "mixer") -> dict:
         """Batch-apply plugin parameter changes in one round-trip.
-        changes: [{"index": int, "value": float 0.0..1.0 normalized}]."""
-        return plugin_tools.set_params(get_client(), track, slot, changes)
+        changes: [{"index": int, "value": float 0.0..1.0 normalized}].
+        location: "mixer" (default) for FX chain plugins, "channel" for
+        channel-rack instruments."""
+        return plugin_tools.set_params(get_client(), track, slot, changes,
+                                       location=location)
 
     @mcp.tool()
-    def fl_get_plugin_param(track: int, slot: int, index: int) -> dict:
+    def fl_get_plugin_param(track: int, slot: int, index: int,
+                             location: str = "mixer") -> dict:
         """Read one plugin parameter's current value (normalized 0.0..1.0)
-        plus its display string."""
-        return plugin_tools.get_param(get_client(), track, slot, index)
+        plus its display string.
+        location: "mixer" (default) for FX chain plugins, "channel" for
+        channel-rack instruments."""
+        return plugin_tools.get_param(get_client(), track, slot, index,
+                                      location=location)
 
     # --- Mixer ------------------------------------------------------------
 

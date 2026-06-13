@@ -14,7 +14,9 @@ Bridge handler facts (device_FLStudioMCP.py, _resolve_plugin_loc):
 from __future__ import annotations
 
 import json
+import os
 import re
+import struct
 from pathlib import Path
 
 DEFAULT_CACHE = Path(__file__).resolve().parents[3] / "schemas" / "generated"
@@ -135,3 +137,83 @@ def get_param(
         "location": location,
         "param": index,
     })
+
+
+# ---------------------------------------------------------------------------
+# Plugin database scanner (disk-side, no bridge call required)
+# ---------------------------------------------------------------------------
+
+_DEFAULT_PLUGIN_DB = (
+    Path(os.environ.get("FLSTUDIO_INSTALL", r"D:\Image-Line\FL Studio"))
+    / "Presets" / "Plugin database" / "Installed"
+)
+
+
+def _fst_plugin_name(path: Path) -> str | None:
+    """Extract the plugin display name from an FL Studio .fst database file.
+
+    FST files embed strings as null-terminated UTF-16 LE sequences.
+    The layout is typically: [wrapper-type-name, plugin-display-name, ...].
+    """
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return None
+    # Find all UTF-16 LE string runs (at least 3 chars = 6 bytes)
+    matches = re.findall(rb"(?:[\x20-\x7e]\x00){3,}", data)
+    strings = [m.decode("utf-16-le").rstrip("\x00") for m in matches]
+    if len(strings) >= 2:
+        return strings[1]
+    if strings:
+        return strings[0]
+    return None
+
+
+def list_available_plugins(
+    plugin_db: Path = _DEFAULT_PLUGIN_DB,
+) -> dict:
+    """Scan the FL Studio plugin database and return all installed plugins.
+
+    Returns:
+        {
+          "total": int,
+          "plugins": [
+            {
+              "name": str,
+              "type": "effect" | "generator",
+              "format": "fruity" | "vst" | "vst3" | "unknown",
+            },
+            ...
+          ]
+        }
+    """
+    if not plugin_db.is_dir():
+        return {
+            "total": 0,
+            "plugins": [],
+            "error": f"Plugin database not found: {plugin_db}",
+        }
+
+    results: list[dict] = []
+    seen: set[tuple[str, str, str]] = set()
+
+    for fst_path in sorted(plugin_db.rglob("*.fst")):
+        rel = fst_path.relative_to(plugin_db)
+        parts = rel.parts
+
+        # parts[0] = "Effects" | "Generators", parts[1] = "VST" | "VST3" | "Fruity" | ...
+        raw_type = parts[0].lower() if len(parts) >= 1 else "unknown"
+        raw_fmt = parts[1].lower() if len(parts) >= 2 else "unknown"
+
+        plugin_type = "effect" if "effect" in raw_type else "generator" if "generator" in raw_type else raw_type
+        fmt = "fruity" if raw_fmt == "fruity" else "vst3" if raw_fmt == "vst3" else "vst" if raw_fmt == "vst" else "unknown"
+
+        name = _fst_plugin_name(fst_path) or fst_path.stem
+        key = (name, plugin_type, fmt)
+        if key in seen:
+            continue
+        seen.add(key)
+        results.append({"name": name, "type": plugin_type, "format": fmt})
+
+    results.sort(key=lambda p: (p["type"], p["format"], p["name"].lower()))
+    return {"total": len(results), "plugins": results}
