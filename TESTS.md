@@ -138,13 +138,25 @@ threshold_normalized = (dB + 100) / 100.0
 | 8 | (vide) | — |
 | 9 | ValhallaSpaceModulator | VST3 — reverb |
 
-### Tests à effectuer
+### Résultats (2026-06-13)
 
-- [ ] Découverte paramètres (9 plugins) — mesure du temps total
-- [ ] Application preset vocal (batch multi-slot)
-- [ ] Enable/disable slot (bouton vert)
-- [ ] Suppression d'un plugin de slot
-- [ ] Sidechain track 2 → track 6 (Insert 6 — delay chain)
+| Test | Résultat | Détail |
+|------|----------|--------|
+| Comptage params 9 plugins | ✅ 1.07s total | ~0.10s/plugin, tous 4240 params (format Waves) |
+| Application preset 7 plugins | ✅ **0.89s** | 14 changements de paramètres batch |
+| Enable/disable bouton vert | ✅ | Via `setParamValue(pid=-1)` — stratégie interne FL Studio |
+| Suppression plugin de slot | ❌ | API FL Studio 2025 ne l'expose pas (removeTrackPlugin absent) |
+| Sidechain track 2 → track 6 | ✅ | `mixer.sidechain` active=True, level=0.8 confirmé |
+
+### Calibrations Waves (patterns communs à tous les plugins Waves)
+
+- Threshold : v=1.0 = 0 dB (maximum, pas de compression). Formule approximative C1 : `v = 1 + dB/100`
+- RCompressor Ratio : **échelle inversée** — v=0.4 ≈ 4:1, v=0.514 = 2:1, v=0.0 = 50:1
+- Smack Attack : param 0 = Bypass (0=Off=actif), params 2-12 = contrôles réels
+
+### Limitation connue : suppression de plugin
+
+Impossible via API de scripting FL Studio 2025. Seule alternative : automatisation UI (clic droit → Supprimer). Non implémentée pour l'instant.
 
 ---
 
@@ -163,11 +175,12 @@ threshold_normalized = (dB + 100) / 100.0
 | 6 | Pro-Q 3 |
 | 7 | Fruity Limiter |
 
-### Tests à effectuer
+### Résultats (2026-06-13)
 
-- [ ] `fl_set_sidechain(src=2, dst=6)` — activer route EFFET VOIX → Insert 6
-- [ ] Vérification `getRouteSendActive`
-- [ ] Réglage level send
+| Test | Résultat | Détail |
+|------|----------|--------|
+| `fl_set_sidechain(src=2, dst=6, level=0.8)` | ✅ | active=True, level=0.8 |
+| `fl_get_route_info(src=2, dst=6)` | ✅ | Lecture état route confirmée |
 
 ---
 
@@ -177,9 +190,11 @@ threshold_normalized = (dB + 100) / 100.0
 |---------|--------|--------|
 | `fl_list_available_plugins` | `a437ee8` | ✅ Live |
 | Fix `location="mixer"` default | `a437ee8` | ✅ Live |
-| `fl_set_slot_enabled` | en cours | 🔧 Bridge déployé, test à faire |
-| `fl_remove_plugin` | en cours | 🔧 Bridge déployé, test à faire |
-| `fl_set_sidechain` | en cours | 🔧 Bridge déployé, test à faire |
+| `fl_set_slot_enabled` | `c10db48` | ✅ Testé — fonctionne via pid=-1 |
+| `fl_remove_plugin` | `c10db48` | ❌ API FL 2025 ne supporte pas la suppression |
+| `fl_set_sidechain` | `c10db48` | ✅ Testé — route active confirmée |
+| `fl_get_route_info` | `c10db48` | ✅ Testé |
+| `fl_get_full_track_info` | `c10db48` | ✅ Testé (enabled=None car isEnabled absent) |
 
 ---
 
