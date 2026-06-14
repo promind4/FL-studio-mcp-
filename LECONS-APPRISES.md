@@ -186,8 +186,16 @@ Un seul handler de probe qui exécute les tests *à l'intérieur* du sandbox a t
 → Quand une limite d'environnement est « supposée », **fais-la dire à l'environnement lui-même**
 avant de bâtir des contournements.
 
-**Ne jamais re-tenter TCP/fichiers/ctypes** sauf changement majeur de version FL. Détails complets :
-`INVESTIGATIONS-FUTURES.md` §3.
+**Test admin (2026-06-14)** : on a relancé FL Studio **en administrateur** et re-lancé la probe.
+`file_write` reste `BLOCKED` (`_io.FileIO returned NULL`). L'élévation de privilèges ne change
+rien → ce n'est PAS une restriction de droits Windows, mais un **durcissement Image-Line dans le
+build Windows** (les constructeurs C `_io.FileIO`/`_socket.socket`/`start_new_thread` sont
+neutralisés). Un sous-interpréteur CPython standard autorise pourtant ces trois ; seule la limite
+`_ctypes` est universelle. Le bus fichier de Calvin marche sur Mac parce que le build **macOS**
+n'a pas le même durcissement — pas une question d'OS, une question de build.
+
+**Ne jamais re-tenter TCP/fichiers/ctypes** sauf changement majeur de version FL (même en admin).
+Détails complets : `INVESTIGATIONS-FUTURES.md` §3.
 
 ---
 

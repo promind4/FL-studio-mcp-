@@ -1,0 +1,94 @@
+{
+  "_meta": {
+    "file": "MCP_Template.flp",
+    "description": "FL Studio mega-template — all slots bypassed, LLM enables what it needs",
+    "created": "2026-06-14",
+    "all_slots_bypassed": true,
+    "notes": "Slot indices are 0-based. Track 0 = Master bus."
+  },
+  "tracks": [
+    {
+      "track": 0,
+      "name": "MASTER",
+      "role": "master_bus",
+      "slots": [
+        {"slot": 0, "plugin": "FabFilter Pro-Q 3",       "role": "eq"},
+        {"slot": 1, "plugin": "FabFilter Pro-C 2",       "role": "compression"},
+        {"slot": 2, "plugin": "SSLComp",                 "role": "bus_glue"},
+        {"slot": 3, "plugin": "Vitamin",                 "role": "enhancement"},
+        {"slot": 4, "plugin": "WLM",                     "role": "loudness_meter"},
+        {"slot": 5, "plugin": "Tonal Balance Control 2", "role": "reference"}
+      ]
+    },
+    {
+      "track": 1,
+      "name": "VOCAL PRINCIPAL",
+      "role": "lead_vocal",
+      "slots": [
+        {"slot": 0, "plugin": "Auto-Tune",      "role": "pitch_correction"},
+        {"slot": 1, "plugin": "NS1",            "role": "noise_gate"},
+        {"slot": 2, "plugin": "FabFilter Pro-Q 3", "role": "eq"},
+        {"slot": 3, "plugin": "CLA-76",         "role": "compression_fast"},
+        {"slot": 4, "plugin": "Sibilance",      "role": "de_esser"},
+        {"slot": 5, "plugin": "PuigTec EQP1A", "role": "eq_vintage"},
+        {"slot": 6, "plugin": "S1 Imager",     "role": "stereo_image"},
+        {"slot": 7, "plugin": "Vocal Rider",   "role": "auto_gain"}
+      ]
+    },
+    {
+      "track": 2,
+      "name": "ADLIB",
+      "role": "backing_vocal",
+      "slots": [
+        {"slot": 0, "plugin": "NS1",            "role": "noise_gate"},
+        {"slot": 1, "plugin": "FabFilter Pro-Q 3", "role": "eq"},
+        {"slot": 2, "plugin": "CLA-76",         "role": "compression_fast"},
+        {"slot": 3, "plugin": "RComp",          "role": "compression"},
+        {"slot": 4, "plugin": "Sibilance",      "role": "de_esser"},
+        {"slot": 5, "plugin": "H-Delay",        "role": "delay"},
+        {"slot": 6, "plugin": "ValhallaSpaceModulator", "role": "reverb_modulation"}
+      ]
+    },
+    {
+      "track": 3,
+      "name": "VOIX FX",
+      "role": "vocal_effects",
+      "slots": [
+        {"slot": 0, "plugin": "FabFilter Pro-Q 3", "role": "eq"},
+        {"slot": 1, "plugin": "CLA-2A",         "role": "compression_opto"},
+        {"slot": 2, "plugin": "Reel ADT",       "role": "doubling"},
+        {"slot": 3, "plugin": "MetaFlanger",    "role": "modulation"}
+      ]
+    },
+    {
+      "track": 4,
+      "name": "INSTRUMENTS",
+      "role": "beat_instruments",
+      "slots": [
+        {"slot": 0, "plugin": "FabFilter Pro-Q 3", "role": "eq"},
+        {"slot": 1, "plugin": "FabFilter Pro-C 2", "role": "compression"},
+        {"slot": 2, "plugin": "RComp",          "role": "compression_parallel"}
+      ]
+    },
+    {
+      "track": 5,
+      "name": "REVERB BUS",
+      "role": "reverb_send",
+      "slots": [
+        {"slot": 0, "plugin": "FabFilter Pro-Q 3", "role": "eq_pre"},
+        {"slot": 1, "plugin": "FabFilter Pro-R",   "role": "reverb"},
+        {"slot": 2, "plugin": "ValhallaSpaceModulator", "role": "modulation"}
+      ]
+    },
+    {
+      "track": 6,
+      "name": "DELAY BUS",
+      "role": "delay_send",
+      "slots": [
+        {"slot": 0, "plugin": "FabFilter Pro-Q 3", "role": "eq_pre"},
+        {"slot": 1, "plugin": "H-Delay",           "role": "delay"},
+        {"slot": 2, "plugin": "C1Comp",            "role": "ducking"}
+      ]
+    }
+  ]
+}

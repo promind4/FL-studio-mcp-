@@ -92,6 +92,22 @@ si le port 9876 ne répond pas, bascule MIDI).
 
 **MIDI n'était jamais un compromis temporaire — c'est la solution unique et correcte.**
 
+**Test admin (2026-06-14) — re-prouvé une 2ᵉ fois :** on a relancé FL Studio **en tant
+qu'administrateur** puis re-lancé la probe. Résultat **identique** : `file_write → BLOCKED:
+SystemError: <class '_io.FileIO'> returned NULL`. L'élévation de privilèges ne change rien.
+→ La restriction n'est PAS une question de droits Windows (integrity level / ACL), sinon l'admin
+l'aurait corrigée. C'est un **durcissement délibéré d'Image-Line dans le build Windows** :
+`_io.FileIO`, `_socket.socket` et `start_new_thread` ont leur constructeur C neutralisé (slot
+`tp_new` qui renvoie NULL). Un sous-interpréteur CPython *standard* autorise pourtant file I/O,
+sockets et threads — seule la limite `_ctypes` est universelle. Donc le NULL sur `_io.FileIO`
+est spécifique au build FL Windows.
+
+**Pourquoi le bus fichier de Calvin marche sur Mac mais pas Windows :** ce n'est pas l'OS, ce
+sont les **deux builds FL qui ne sont pas durcis pareil**. Le build macOS laisse `open()` passer
+(Calvin l'exploite), le build Windows l'a fermé. Même version 2025, même Python embarqué,
+hardening différent par plateforme. → **Ne jamais re-tenter le bus fichier sur Windows**, même
+en admin, sauf changement majeur de build FL Studio.
+
 **Note latence :** le timeout de `fl_load_mixer_preset` n'a **rien à voir** avec le transport.
 Il vient de `navigateBrowser` (~300 ms/appel × N appels) exécuté sur le thread principal de FL.
 Un transport plus rapide n'y changerait rien. Solution chargement plugin = mega-template (Option 3).
