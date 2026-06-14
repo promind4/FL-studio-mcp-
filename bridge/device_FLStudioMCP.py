@@ -1415,20 +1415,15 @@ def h_meta_sandbox_probe(_):
 
 
 def h_browser_probe_nav(_):
-    """Map the FL Studio browser structure using the three navigation functions
-    we have never tested: navigateBrowserTabs, navigateBrowserMenu, toggleBrowserNode.
+    """Map the FL Studio browser structure using navigateBrowserTabs, navigateBrowserMenu,
+    and toggleBrowserNode.
 
-    Records the caption + fileType after each call so we can understand:
-    - How many tabs exist and what they contain
-    - Whether navigateBrowserMenu jumps by section or by item
-    - Whether toggleBrowserNode opens a folder node
-
-    Returns a dict with all observations. Does NOT restore browser position
-    (we want to leave it on the Mixer presets section if we find it).
+    ⚠️  SAFETY: navigateBrowserTabs/navigateBrowserMenu cause a native FL Studio crash
+    ("Cannot focus a disabled or invisible window") if the browser panel is not open.
+    We MUST open the browser first. The crash is native — no Python try/except can catch it.
     """
-    import time as _time
-
     result = {
+        "browser_open_attempts": [],
         "initial": {},
         "tabs": [],
         "menu_steps": [],
@@ -1447,24 +1442,45 @@ def h_browser_probe_nav(_):
             ftype = "ERR:" + str(e)
         return {"caption": cap, "fileType": ftype}
 
-    # --- 0. Record initial state ---
+    # --- 0. CRITICAL: Open browser before any navigation ---
+    # navigateBrowserTabs crashes FL Studio natively if browser is hidden.
+    # Try every known method to make the browser visible.
+    opened = False
+    for label, fn in [
+        ("showBrowser", lambda: getattr(ui, "showBrowser")()),
+        ("showWindow(4)", lambda: ui.showWindow(4)),
+        ("setFocused(4)", lambda: ui.setFocused(4)),
+        ("showWindow(0)", lambda: ui.showWindow(0)),  # last resort: mixer focus
+    ]:
+        try:
+            fn()
+            result["browser_open_attempts"].append({"method": label, "ok": True})
+            opened = True
+            break
+        except Exception as e:
+            result["browser_open_attempts"].append({"method": label, "error": str(e)})
+
+    if not opened:
+        result["error"] = "Could not open browser panel — aborting to prevent crash"
+        return result
+
+    # --- 1. Record initial state ---
     result["initial"] = _snap()
 
-    # --- 1. Probe navigateBrowserTabs: step through tabs forward (max 16) ---
-    for i in range(16):
+    # --- 2. Probe navigateBrowserTabs: step through tabs forward (max 12) ---
+    for i in range(12):
         try:
             ui.navigateBrowserTabs(1, 1)
             s = _snap()
             s["tab_step"] = i + 1
             result["tabs"].append(s)
-            # Stop if we see "Mixer" in the caption (found our target)
             if "mixer" in s["caption"].lower() or "preset" in s["caption"].lower():
                 s["TARGET_FOUND"] = True
         except Exception as e:
             result["tabs"].append({"tab_step": i + 1, "error": str(e)})
             break
 
-    # --- 2. From current position, probe navigateBrowserMenu (up to 20 steps down) ---
+    # --- 3. Probe navigateBrowserMenu (up to 20 steps down) ---
     for i in range(20):
         try:
             ui.navigateBrowserMenu(1, 1)
@@ -1473,14 +1489,10 @@ def h_browser_probe_nav(_):
             result["menu_steps"].append(s)
             if "mixer" in s["caption"].lower() or "preset" in s["caption"].lower():
                 s["TARGET_FOUND"] = True
-                # Try toggleBrowserNode to expand this section
                 try:
                     ui.toggleBrowserNode()
                     after = _snap()
-                    result["toggle_test"] = {
-                        "before": s["caption"],
-                        "after_toggle": after,
-                    }
+                    result["toggle_test"] = {"before": s["caption"], "after_toggle": after}
                 except Exception as te:
                     result["toggle_test"] = {"error": str(te)}
                 break
@@ -1488,7 +1500,7 @@ def h_browser_probe_nav(_):
             result["menu_steps"].append({"menu_step": i + 1, "error": str(e)})
             break
 
-    # --- 3. Final state ---
+    # --- 4. Final state ---
     result["final"] = _snap()
     return result
 

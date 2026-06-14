@@ -199,6 +199,29 @@ Détails complets : `INVESTIGATIONS-FUTURES.md` §3.
 
 ---
 
+## Crash natif FL Studio : navigateBrowserTabs / navigateBrowserMenu (2026-06-14)
+
+**Exception :** `Cannot focus a disabled or invisible window`  
+**Callstack :** FLEngine_x64.dll + Python312.dll — crash **natif**, non attrapable en Python.
+
+**Cause :** `ui.navigateBrowserTabs()` et `ui.navigateBrowserMenu()` tentent de donner le focus
+au panneau Browser de FL Studio. Si ce panneau est fermé/invisible au moment de l'appel, FL Studio
+crash immédiatement sans possibilité de `try/except`.
+
+**Règle :** Toujours ouvrir le browser AVANT d'appeler ces fonctions. La séquence sûre :
+```python
+ui.showWindow(4)  # ou ui.setFocused(4) — ouvre le browser
+# … PUIS seulement appeler navigateBrowserTabs / navigateBrowserMenu
+```
+
+**Fix appliqué :** `h_browser_probe_nav` tente désormais plusieurs méthodes d'ouverture
+(`showBrowser`, `showWindow(4)`, `setFocused(4)`) et retourne une erreur explicite si aucune
+ne fonctionne — plutôt que de crasher FL Studio.
+
+**Ne jamais appeler navigateBrowserTabs / navigateBrowserMenu sans ouvrir le browser d'abord.**
+
+---
+
 ## Formules de calibration Pro-Q 3 (location="mixer")
 
 ```python
