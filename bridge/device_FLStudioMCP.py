@@ -1217,47 +1217,134 @@ def h_plugins_load_attempt(_):
     return {"strategies": report, "all_attrs": full}
 
 
-def h_meta_probe_windows(_):
-    """Probe FL Studio window system to find Plugin Picker window ID."""
+def h_meta_sandbox_probe(_):
+    """Ground-truth sandbox probe — what does FL 2025's subinterpreter allow?
+
+    Gathers IPC-capability evidence on demand over the working MIDI channel.
+    Reports live listener state + fresh capability tests for socket / bind /
+    thread / file / ctypes so transport decisions rest on proof, not inference.
+
+    VERDICT (2026-06-14): everything except MIDI SysEx is hard-blocked —
+    socket/thread/file constructors return NULL, _ctypes won't import in the
+    subinterpreter. MIDI SysEx is the only viable transport. See LECONS-APPRISES.
+    """
     result = {}
 
-    # midi wid* constants
-    midi_consts = {}
-    for name in sorted(dir(midi)):
-        if name.startswith("_"):
-            continue
-        try:
-            val = getattr(midi, name)
-            if isinstance(val, int):
-                midi_consts[name] = val
-        except Exception:
-            pass
-    result["midi_int_constants"] = midi_consts
+    # --- live TCP listener state (set at OnInit by _start_listening) ---
+    result["accept_socket_active"] = _accept_socket is not None
+    result["bind_attempts"] = _bind_attempts
+    result["midi_active"] = _midi_active
+    result["bridge_host"] = BRIDGE_HOST
+    result["bridge_port"] = BRIDGE_PORT
 
-    # current window state
-    for fn_name in ("getFocused", "getFocusedFormID", "getFocusedFormCaption"):
-        fn = getattr(ui, fn_name, None)
-        if fn:
-            try:
-                result[fn_name] = fn() if fn_name != "getFocused" else fn(0)
-            except Exception as e:
-                result[fn_name + "_error"] = str(e)
+    # --- can we create a TCP socket? ---
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.close()
+        result["socket_create"] = "OK"
+    except BaseException as e:
+        result["socket_create"] = "BLOCKED: %s: %s" % (type(e).__name__, e)
 
-    # probe showWindow + getVisible for IDs 0-19
-    windows = {}
-    for wid in range(20):
-        entry = {}
+    # --- can we bind + listen on an ephemeral port (non-blocking)? ---
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind((BRIDGE_HOST, 0))
+        port = s.getsockname()[1]
+        s.listen(1)
+        s.setblocking(False)
+        s.close()
+        result["socket_bind_listen"] = "OK (ephemeral %d)" % port
+    except BaseException as e:
+        result["socket_bind_listen"] = "BLOCKED: %s: %s" % (type(e).__name__, e)
+
+    # --- can we self-connect to the bridge's own listener on 9876? ---
+    if _accept_socket is not None:
         try:
-            ui.showWindow(wid)
-            entry["show"] = "ok"
-        except Exception as e:
-            entry["show"] = str(e)
-        try:
-            entry["visible"] = ui.getVisible(wid)
-        except Exception as e:
-            entry["visible"] = str(e)
-        windows[str(wid)] = entry
-    result["windows"] = windows
+            c = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            c.settimeout(1.0)
+            c.connect((BRIDGE_HOST, BRIDGE_PORT))
+            c.close()
+            result["self_connect_9876"] = "OK — listener reachable"
+        except BaseException as e:
+            result["self_connect_9876"] = "FAIL: %s: %s" % (type(e).__name__, e)
+
+    # --- thread creation (the original geezoria blocker)? ---
+    try:
+        import threading
+        flag = {"ran": False}
+        th = threading.Thread(target=lambda: flag.__setitem__("ran", True))
+        th.start()
+        th.join(timeout=1.0)
+        result["thread_create"] = "OK (ran=%s)" % flag["ran"]
+    except BaseException as e:
+        result["thread_create"] = "BLOCKED: %s: %s" % (type(e).__name__, e)
+
+    # --- file write (Calvin's file-bus approach)? ---
+    try:
+        p = os.path.join(os.path.expanduser("~"), "flmcp_probe2.txt")
+        with open(p, "w") as f:
+            f.write("ok")
+        os.remove(p)
+        result["file_write"] = "OK"
+    except BaseException as e:
+        result["file_write"] = "BLOCKED: %s: %s" % (type(e).__name__, e)
+
+    # --- ctypes availability (does the FFI bridge to the OS work at all?) ---
+    try:
+        import ctypes
+        tick = ctypes.windll.kernel32.GetTickCount()
+        result["ctypes_kernel32"] = "OK (tick=%d)" % tick
+    except BaseException as e:
+        result["ctypes_kernel32"] = "BLOCKED: %s: %s" % (type(e).__name__, e)
+
+    # --- ctypes file-bus: write + read back a file via raw Win32 API ---
+    # If this works while Python open() is NULL-stubbed, we have a fast IPC
+    # channel (local disk poll ~1ms) that bypasses the sandbox's io block.
+    try:
+        import ctypes
+        from ctypes import wintypes
+        k32 = ctypes.windll.kernel32
+        k32.CreateFileW.restype = wintypes.HANDLE
+        k32.CreateFileW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD,
+                                    wintypes.DWORD, wintypes.LPVOID,
+                                    wintypes.DWORD, wintypes.DWORD,
+                                    wintypes.HANDLE]
+        GENERIC_WRITE = 0x40000000
+        GENERIC_READ = 0x80000000
+        CREATE_ALWAYS = 2
+        OPEN_EXISTING = 3
+        FILE_ATTR_NORMAL = 0x80
+        INVALID = wintypes.HANDLE(-1).value
+        path = os.path.join(os.path.expanduser("~"), "flmcp_ctypes_bus.txt")
+
+        # write
+        h = k32.CreateFileW(path, GENERIC_WRITE, 0, None,
+                            CREATE_ALWAYS, FILE_ATTR_NORMAL, None)
+        if h == INVALID:
+            result["ctypes_file_bus"] = "FAIL CreateFileW(write) err=%d" % k32.GetLastError()
+        else:
+            payload = b'{"flmcp":"ctypes-bus-ok"}'
+            written = wintypes.DWORD(0)
+            ok = k32.WriteFile(h, payload, len(payload),
+                               ctypes.byref(written), None)
+            k32.CloseHandle(h)
+            # read back
+            h2 = k32.CreateFileW(path, GENERIC_READ, 1, None,
+                                 OPEN_EXISTING, FILE_ATTR_NORMAL, None)
+            buf = ctypes.create_string_buffer(64)
+            read = wintypes.DWORD(0)
+            ok2 = k32.ReadFile(h2, buf, 64, ctypes.byref(read), None)
+            k32.CloseHandle(h2)
+            got = buf.raw[:read.value]
+            # cleanup via ctypes DeleteFileW
+            k32.DeleteFileW(path)
+            result["ctypes_file_bus"] = (
+                "OK wrote=%d read=%d match=%s"
+                % (written.value, read.value, got == payload))
+    except BaseException as e:
+        result["ctypes_file_bus"] = "BLOCKED: %s: %s" % (type(e).__name__, e)
+
     return result
 
 
@@ -2408,7 +2495,8 @@ _HANDLERS = {
     "plugins.showEditor": h_plugins_show_editor,
     "plugins.listMixerTrack": h_plugins_list_mixer_track,
     "plugins.loadAttempt": h_plugins_load_attempt,
-    "meta.probeWindows": h_meta_probe_windows,
+    "meta.sandboxProbe": h_meta_sandbox_probe,
+    "meta.probeWindows": h_meta_sandbox_probe,  # legacy alias (no-restart diag)
     "plugins.probeApi": h_plugins_probe_api,
     "plugins.probeBrowserNav": h_plugins_probe_browser_nav,
     "plugins.loadViaUI": h_plugins_load_via_ui,

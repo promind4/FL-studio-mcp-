@@ -50,44 +50,51 @@ reconfigurer une chaîne complète.
 
 ---
 
-## 🟡 PRIORITÉ MOYENNE — Confirmé limité, mais optimisation possible
+## ✅ RÉSOLU — Transport TCP : CONFIRMÉ IMPOSSIBLE (preuve, plus une inférence)
 
-### 3. Transport TCP au lieu de MIDI SysEx
+### 3. Transport TCP au lieu de MIDI SysEx — TRANCHÉ le 2026-06-14
 
-**Statut actuel :** abandonné. Pivot vers MIDI SysEx le 2026-06-12.
+**Statut :** ❌ **Définitivement impossible.** Ne plus jamais re-tester sauf changement
+majeur de version FL Studio.
 
-**Raison du pivot :** « le sandbox Python de FL Studio 2025 bloque sockets, threads, etc. »
+**Comment on l'a prouvé :** handler `meta.sandboxProbe` (tool `fl_probe_sandbox`) qui exécute
+les tests de capacité *en direct* dans le sous-interpréteur FL et renvoie le résultat par MIDI.
+Plus aucune inférence — voici les retours bruts :
 
-**Ce qu'on n'a PAS confirmé :**
-- On n'a **jamais exécuté `import socket` depuis le script MIDI** et vu le résultat.
-- La limitation a été **inférée** depuis la documentation du sandbox FL 2025, pas testée.
-- Le `BridgeClient` TCP existe dans le serveur MCP et fonctionne — seul le côté FL est en question.
-
-**Comparaison :**
-
-| Critère | MIDI SysEx (actuel) | TCP (potentiel) |
-|---------|---------------------|-----------------|
-| Latence | ~100–200 ms/call | ~2–5 ms/call |
-| Stabilité | ✅ validée | Inconnue |
-| Complexité | Faible (un seul transport) | Moyenne (fallback MIDI si TCP absent) |
-| Nécessite loopMIDI | Oui | Non |
-
-**Ce qu'il faudra tester (quand MIDI est stable + committé) :**
-```python
-# Dans device_FLStudioMCP.py, ajouter en haut :
-try:
-    import socket
-    _TCP_AVAILABLE = True
-except ImportError:
-    _TCP_AVAILABLE = False
-# → si _TCP_AVAILABLE = True dans les logs FL, TCP est possible
+```
+socket_create  → BLOCKED: SystemError: socket.__init__ returned NULL
+socket_bind    → BLOCKED: idem
+thread_create  → BLOCKED: SystemError: start_new_thread returned NULL
+file_write     → BLOCKED: SystemError: _io.FileIO returned NULL
+ctypes         → BLOCKED: ImportError: module _ctypes does not support
+                          loading in subinterpreters
+accept_socket_active → false   (le listener TCP n'a jamais pu démarrer)
+midi_active          → true    (seul canal vivant)
 ```
 
-**Impact si TCP fonctionne :** ×40 de gain en latence, suppression de la dépendance loopMIDI,
-fiabilité accrue (TCP est orienté connexion vs SysEx best-effort).
+**Analyse :** le sandbox neutralise les **constructeurs C eux-mêmes** (NULL sans exception).
+`_ctypes` refuse même de s'importer dans un sous-interpréteur (limitation CPython connue).
+Donc :
 
-**Décision actuelle :** rester MIDI tant que c'est stable. Tester TCP en parallèle quand
-l'architecture est figée sur GitHub.
+| Piste envisagée | Verdict | Raison |
+|---|---|---|
+| Socket non-bloquant dans OnIdle (Piste A) | ❌ | `socket.socket()` → NULL avant tout |
+| Déporter le réseau côté serveur (Piste C) | ❌ | le bridge ne peut ouvrir ni socket ni fichier |
+| Bus de fichiers (méthode Calvin/MacFLStudioMCP) | ❌ | `open()` en écriture → NULL |
+| Bus de fichiers via ctypes (CreateFileW raw) | ❌ | `_ctypes` ne charge pas en subinterpreter |
+| **MIDI SysEx** | ✅ | API FL native (`device.midiOutSysex`/`OnMidiIn`), hors I/O Python |
+
+**Conséquence importante :** le code TCP non-bloquant existe déjà dans le bridge
+(`_start_listening`, `_pump_network` appelé depuis `OnIdle`) — l'architecture Piste A était
+déjà implémentée correctement. Elle échoue uniquement parce que `socket.socket()` retourne NULL.
+Le `BridgeClient` TCP côté serveur reste en place comme fallback inerte (auto-détection :
+si le port 9876 ne répond pas, bascule MIDI).
+
+**MIDI n'était jamais un compromis temporaire — c'est la solution unique et correcte.**
+
+**Note latence :** le timeout de `fl_load_mixer_preset` n'a **rien à voir** avec le transport.
+Il vient de `navigateBrowser` (~300 ms/appel × N appels) exécuté sur le thread principal de FL.
+Un transport plus rapide n'y changerait rien. Solution chargement plugin = mega-template (Option 3).
 
 ---
 

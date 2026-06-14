@@ -292,10 +292,11 @@ def build_server() -> FastMCP:
     # --- Plugin loading -----------------------------------------------------
 
     @mcp.tool()
-    def fl_probe_plugin_loading() -> dict:
-        """Probe FL Studio window IDs (midi wid* constants + showWindow test)
-        to find the Plugin Picker window for programmatic plugin loading."""
-        return get_client().call("meta.probeWindows")
+    def fl_probe_sandbox() -> dict:
+        """Probe what FL Studio 2025's Python subinterpreter allows: socket,
+        thread, file I/O, ctypes, plus live TCP-listener state. Returns proof
+        (not inference) of why MIDI SysEx is the only viable transport."""
+        return get_client().call("meta.sandboxProbe")
 
     @mcp.tool()
     def fl_probe_all_modules() -> dict:

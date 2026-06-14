@@ -159,6 +159,38 @@ dans le bridge. De toute façon devenu inutile (`setParamValue` suffit).
 
 ---
 
+## Transport : pourquoi MIDI SysEx et rien d'autre (verdict 2026-06-14)
+
+**Question tranchée définitivement** : peut-on remplacer MIDI SysEx (~150 ms/appel) par un canal
+plus rapide — TCP, bus de fichiers, ctypes ? **Non. Prouvé, plus inféré.**
+
+Le sandbox Python de FL Studio 2025 tourne dans un **sous-interpréteur** qui neutralise les
+constructeurs C eux-mêmes. Le handler `meta.sandboxProbe` (tool `fl_probe_sandbox`) l'exécute en
+direct et renvoie par MIDI :
+
+```
+socket.socket()      → NULL (SystemError sans exception)
+start_new_thread     → NULL
+_io.FileIO (open w)  → NULL
+import ctypes        → ImportError: _ctypes ne charge pas en subinterpreter
+device.midiOutSysex  → OK  ← seul canal vivant (API FL, pas de l'I/O Python)
+```
+
+**Toutes** les pistes alternatives sont mortes : socket non-bloquant dans OnIdle, bus de fichiers
+(approche Calvin/MacFLStudioMCP), bus de fichiers via ctypes raw Win32. Le code TCP non-bloquant
+existe déjà dans le bridge (`_start_listening`/`_pump_network` dans `OnIdle`) — l'architecture
+était correcte, elle échoue juste parce que `socket.socket()` retourne NULL.
+
+**Leçon méta** : on avait *inféré* cette limite depuis la doc sans la tester (3 sessions de doute).
+Un seul handler de probe qui exécute les tests *à l'intérieur* du sandbox a tranché en un appel.
+→ Quand une limite d'environnement est « supposée », **fais-la dire à l'environnement lui-même**
+avant de bâtir des contournements.
+
+**Ne jamais re-tenter TCP/fichiers/ctypes** sauf changement majeur de version FL. Détails complets :
+`INVESTIGATIONS-FUTURES.md` §3.
+
+---
+
 ## Formules de calibration Pro-Q 3 (location="mixer")
 
 ```python
