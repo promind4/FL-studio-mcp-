@@ -1156,6 +1156,14 @@ def h_plugins_set_preset(p):
     return {"ok": True}
 
 
+def h_plugins_set_param_rec(p):
+    """DISABLED — processRECEvent with plugin param event IDs causes FL Studio
+    to crash with an access violation in FLEngine_x64.dll.
+    The formula mixer.getTrackPluginId()+paramIdx is NOT the correct event ID.
+    Use plugins.setPreset to activate bands instead."""
+    return {"ok": False, "error": "disabled: processRECEvent formula caused FL crash"}
+
+
 def h_plugins_show_editor(p):
     idx, slot, ug = _resolve_plugin_loc(p)
     show = p.get("show")
@@ -1187,8 +1195,8 @@ def h_plugins_list_mixer_track(p):
 
 
 def h_plugins_load_attempt(_):
-    """Probe runtime API for plugin-loading capabilities (FL 2025 may
-    expose more than the public stubs)."""
+    """Probe runtime API for plugin-loading capabilities + full module attribute dump."""
+    # Quick hasattr checks
     report = {}
     for mod, fn in ((mixer, "loadPlugin"), (plugins, "load"),
                     (channels, "addChannel"), (mixer, "trackPluginLoad")):
@@ -1196,22 +1204,344 @@ def h_plugins_load_attempt(_):
     for fn in ("navigateBrowser", "selectBrowserMenuItem", "findBrowserItem",
                "getFocusedNodeCaption", "enterBrowserMenu", "previewBrowserMenuItem"):
         report["ui.%s" % fn] = hasattr(ui, fn)
-    return {"strategies": report}
+
+    # Full attribute dump for mixer and ui
+    full = {}
+    for mod in (mixer, ui):
+        attrs = []
+        for name in sorted(dir(mod)):
+            if not name.startswith("_"):
+                attrs.append(name)
+        full[mod.__name__] = attrs
+
+    return {"strategies": report, "all_attrs": full}
 
 
-def h_plugins_probe_api(_):
-    """Return all callable attributes of the plugins module — used to
-    discover undocumented enable/disable/remove functions at runtime."""
-    attrs = {}
-    for name in dir(plugins):
+def h_meta_probe_windows(_):
+    """Probe FL Studio window system to find Plugin Picker window ID."""
+    result = {}
+
+    # midi wid* constants
+    midi_consts = {}
+    for name in sorted(dir(midi)):
         if name.startswith("_"):
             continue
         try:
-            obj = getattr(plugins, name)
-            attrs[name] = callable(obj)
+            val = getattr(midi, name)
+            if isinstance(val, int):
+                midi_consts[name] = val
         except Exception:
             pass
-    return {"attrs": attrs}
+    result["midi_int_constants"] = midi_consts
+
+    # current window state
+    for fn_name in ("getFocused", "getFocusedFormID", "getFocusedFormCaption"):
+        fn = getattr(ui, fn_name, None)
+        if fn:
+            try:
+                result[fn_name] = fn() if fn_name != "getFocused" else fn(0)
+            except Exception as e:
+                result[fn_name + "_error"] = str(e)
+
+    # probe showWindow + getVisible for IDs 0-19
+    windows = {}
+    for wid in range(20):
+        entry = {}
+        try:
+            ui.showWindow(wid)
+            entry["show"] = "ok"
+        except Exception as e:
+            entry["show"] = str(e)
+        try:
+            entry["visible"] = ui.getVisible(wid)
+        except Exception as e:
+            entry["visible"] = str(e)
+        windows[str(wid)] = entry
+    result["windows"] = windows
+    return result
+
+
+def h_plugins_probe_api(_):
+    """Return all callable attributes of plugins, mixer and ui modules."""
+    result = {}
+    for mod in (plugins, mixer, ui):
+        attrs = {}
+        for name in dir(mod):
+            if name.startswith("_"):
+                continue
+            try:
+                obj = getattr(mod, name)
+                attrs[name] = callable(obj)
+            except Exception:
+                pass
+        result[mod.__name__] = attrs
+    return result
+
+
+def h_plugins_probe_browser_nav(_):
+    """Targeted probe to gather evidence for browser navigation:
+    1. Introspect ui.navigateBrowser signature.
+    2. Test ui.showWindow(wid) for wid 0-9 and read getFocusedNodeCaption after each.
+    3. Find which wid gives a non-empty, non-plugin caption (= browser).
+    Returns raw evidence dict for analysis.
+    """
+    import inspect
+    result = {}
+
+    # --- navigateBrowser signature ---
+    nb = getattr(ui, "navigateBrowser", None)
+    if nb:
+        try:
+            sig = inspect.getfullargspec(nb)
+            result["navigateBrowser_argspec"] = str(sig)
+        except Exception as e:
+            result["navigateBrowser_argspec_error"] = str(e)
+        # Also try __doc__
+        result["navigateBrowser_doc"] = getattr(nb, "__doc__", None)
+        # Try calling with (direction, step) to find correct signature
+        for args in [(1,), (1, 1), (0, 1), (1, 0)]:
+            try:
+                nb(*args)
+                result["navigateBrowser_working_call"] = str(args)
+                break
+            except TypeError as e:
+                result["navigateBrowser_try_%s" % str(args)] = "TypeError: %s" % e
+            except Exception as e:
+                result["navigateBrowser_try_%s" % str(args)] = str(e)
+    else:
+        result["navigateBrowser"] = "NOT FOUND"
+
+    # --- focusEditor signature probe ---
+    fe = getattr(mixer, "focusEditor", None)
+    if fe:
+        result["focusEditor_doc"] = getattr(fe, "__doc__", None)
+        for args in [(3,), (3, 0), (3, 1)]:
+            try:
+                fe(*args)
+                result["focusEditor_working_call"] = str(args)
+                break
+            except Exception as e:
+                result["focusEditor_try_%s" % str(args)] = "%s: %s" % (type(e).__name__, e)
+
+    # --- showWindow + caption probe ---
+    windows = {}
+    for wid in range(12):
+        entry = {}
+        try:
+            ui.showWindow(wid)
+            cap_after = ui.getFocusedNodeCaption()
+            ftype_after = getattr(ui, "getFocusedNodeFileType", lambda: -999)()
+            visible = ui.getVisible(wid)
+            entry["caption"] = cap_after
+            entry["ftype"] = ftype_after
+            entry["visible"] = visible
+            entry["show"] = "ok"
+        except Exception as e:
+            entry["show_error"] = "%s: %s" % (type(e).__name__, e)
+        windows[str(wid)] = entry
+    result["windows"] = windows
+
+    # --- current focus state ---
+    try:
+        result["getFocusedFormID"] = ui.getFocusedFormID()
+        result["getFocusedFormCaption"] = ui.getFocusedFormCaption()
+        result["getFocusedNodeCaption"] = ui.getFocusedNodeCaption()
+        result["getFocusedNodeFileType"] = getattr(ui, "getFocusedNodeFileType", lambda: -999)()
+    except Exception as e:
+        result["focus_state_error"] = str(e)
+
+    return result
+
+
+def h_mixer_load_fst(p):
+    """Load a Mixer State (.fst) file onto a mixer track via browser navigation.
+
+    The FST must be named _MCP.fst and placed in the same folder as the other
+    mixer presets — it will sort first (underscore < letters) so it is always
+    reachable in at most MAX_SCAN steps from whatever item is currently focused.
+
+    p: {"track": int, "fst_path": str}
+    fst_path is used only for verification; the actual navigation targets the
+    first _MCP.fst in the browser list.
+
+    Returns: {"ok": bool, "log": list}
+    """
+    track = int(p.get("track", 1))
+    fst_name = "_MCP.fst"
+    MAX_SCAN = 30   # well under any timeout
+    log = []
+
+    # Step 1 — select the target mixer track
+    try:
+        mixer.setActiveTrack(track)
+        log.append({"step": "setActiveTrack", "track": track, "ok": True})
+    except Exception as e:
+        return {"ok": False, "log": log, "error": str(e)}
+
+    # Step 2 — read where the browser is now
+    start_cap = ui.getFocusedNodeCaption()
+    log.append({"step": "start_caption", "caption": start_cap})
+
+    # Step 3 — scan UP to find _MCP.fst (it sorts before all alpha names)
+    found = False
+    for i in range(MAX_SCAN):
+        try:
+            cap = ui.getFocusedNodeCaption()
+            if fst_name.lower() in cap.lower():
+                found = True
+                log.append({"step": "found", "caption": cap, "steps": i})
+                break
+            ui.navigateBrowser(-1, 1)   # go up one item
+        except Exception as e:
+            log.append({"step": "scan_up_error", "i": i, "error": str(e)})
+            break
+
+    # If not found going up, try scanning DOWN from start
+    if not found:
+        # Return to start position
+        ui.navigateBrowser(1, MAX_SCAN)
+        for i in range(MAX_SCAN):
+            try:
+                cap = ui.getFocusedNodeCaption()
+                if fst_name.lower() in cap.lower():
+                    found = True
+                    log.append({"step": "found_down", "caption": cap, "steps": i})
+                    break
+                ui.navigateBrowser(1, 1)
+            except Exception as e:
+                log.append({"step": "scan_down_error", "i": i, "error": str(e)})
+                break
+
+    if not found:
+        return {"ok": False, "log": log,
+                "error": "_MCP.fst not found in browser within %d steps" % MAX_SCAN}
+
+    # Step 4 — load the focused FST onto the active track
+    try:
+        ui.selectBrowserMenuItem()
+        log.append({"step": "selectBrowserMenuItem", "ok": True})
+    except Exception as e:
+        return {"ok": False, "log": log, "error": str(e)}
+
+    # Step 5 — verify slots filled
+    slots = []
+    for slot in range(10):
+        try:
+            valid = bool(plugins.isValid(track, slot, False))
+            name = plugins.getPluginName(track, slot, 0, False) if valid else None
+            slots.append({"slot": slot, "valid": valid, "name": name})
+        except Exception:
+            slots.append({"slot": slot, "valid": False, "name": None})
+
+    log.append({"step": "slots_after", "slots": slots})
+    loaded = [s for s in slots if s["valid"]]
+    return {"ok": True, "log": log, "loaded_plugins": loaded}
+
+
+def h_plugins_load_via_ui(p):
+    """Load a plugin into a mixer FX slot using FL Studio UI browser navigation.
+
+    Strategy v3 — based on confirmed evidence:
+    - navigateBrowser(direction, step) WORKS: direction 1=down, -1=up
+    - selectBrowserMenuItem() LOADS the focused item into active track FX chain
+    - showWindow(4) opens a plugin window, NOT the browser panel
+    - We must NOT call selectBrowserMenuItem if plugin was not found
+
+    p: {"track": int, "plugin_name": str, "max_steps": int (default 300)}
+    Returns step-by-step log with found/not-found status.
+    """
+    track = int(p["track"])
+    plugin_name = str(p.get("plugin_name", "Fruity Parametric EQ 2"))
+    max_steps = int(p.get("max_steps", 150))
+    log = []
+
+    # Step 1 — set active track (determines which track receives the plugin)
+    try:
+        mixer.setActiveTrack(track)
+        log.append({"step": "setActiveTrack", "track": track, "ok": True})
+    except Exception as e:
+        log.append({"step": "setActiveTrack", "ok": False, "error": str(e)})
+        return {"log": log, "found": False, "error": str(e)}
+
+    # Step 2 — read current browser position
+    try:
+        start_caption = ui.getFocusedNodeCaption()
+        log.append({"step": "start_caption", "caption": start_caption})
+    except Exception as e:
+        start_caption = ""
+        log.append({"step": "start_caption_error", "error": str(e)})
+
+    # Step 3 — choose direction: compare target vs. current alphabetically
+    # strip "Fruity Wrapper - " prefix for fair alphabetical comparison
+    def _clean(s):
+        return s.lower().replace("fruity wrapper - ", "").strip()
+
+    target_key = _clean(plugin_name)
+    current_key = _clean(start_caption)
+    # direction: -1 = up (go earlier in alphabet), 1 = down (go later)
+    direction = -1 if target_key < current_key else 1
+    log.append({"step": "direction_chosen", "direction": direction,
+                "target_key": target_key, "current_key": current_key})
+
+    # Step 4 — fast search: big jump in chosen direction, then fine scan back
+    # Strategy: jump JUMP_SIZE items at once (1 call), then scan fine (1-by-1)
+    # This keeps total Python calls low (~2 + JUMP_SIZE) to avoid MCP timeout.
+    JUMP_SIZE = 80
+    found_plugin = False
+    found_caption = None
+
+    # Big jump in primary direction (1 call)
+    try:
+        ui.navigateBrowser(direction, JUMP_SIZE)
+        cap_after_jump = ui.getFocusedNodeCaption()
+        log.append({"step": "big_jump", "direction": direction,
+                    "size": JUMP_SIZE, "caption": cap_after_jump})
+    except Exception as e:
+        log.append({"step": "big_jump_error", "error": str(e)})
+
+    # Fine scan in opposite direction (up to JUMP_SIZE*2 steps)
+    scan_dir = -direction  # scan back toward original position and beyond
+    for i in range(JUMP_SIZE * 2):
+        try:
+            cap = ui.getFocusedNodeCaption()
+            if plugin_name.lower() in cap.lower():
+                found_plugin = True
+                found_caption = cap
+                log.append({"step": "plugin_found", "steps": i, "caption": cap})
+                break
+            ui.navigateBrowser(scan_dir, 1)
+        except Exception as e:
+            log.append({"step": "scan_error", "i": i, "error": str(e)})
+            break
+
+    if not found_plugin:
+        log.append({"step": "not_found_after", "steps": JUMP_SIZE * 2})
+
+    if not found_plugin:
+        log.append({"step": "plugin_not_found", "max_steps": max_steps})
+        return {"log": log, "found": False}
+
+    # Step 5 — load: only reached if plugin was found
+    try:
+        ui.selectBrowserMenuItem()
+        log.append({"step": "selectBrowserMenuItem", "ok": True, "loaded": found_caption})
+    except Exception as e:
+        log.append({"step": "selectBrowserMenuItem", "ok": False, "error": str(e)})
+        return {"log": log, "found": True, "loaded": False, "error": str(e)}
+
+    # Step 6 — verify all slots on target track
+    slots_after = []
+    for slot in range(10):
+        try:
+            valid = bool(plugins.isValid(track, slot, False))
+            name = plugins.getPluginName(track, slot, 0, False) if valid else None
+            slots_after.append({"slot": slot, "valid": valid, "name": name})
+        except Exception:
+            slots_after.append({"slot": slot, "valid": False, "name": None})
+    log.append({"step": "slots_after", "slots": slots_after})
+
+    return {"log": log, "found": True, "loaded": True,
+            "loaded_plugin": found_caption, "slots": slots_after}
 
 
 def h_plugins_set_slot_enabled(p):
@@ -2074,10 +2404,15 @@ _HANDLERS = {
     "plugins.nextPreset": h_plugins_next_preset,
     "plugins.prevPreset": h_plugins_prev_preset,
     "plugins.setPreset": h_plugins_set_preset,
+    "plugins.setParamREC": h_plugins_set_param_rec,
     "plugins.showEditor": h_plugins_show_editor,
     "plugins.listMixerTrack": h_plugins_list_mixer_track,
     "plugins.loadAttempt": h_plugins_load_attempt,
+    "meta.probeWindows": h_meta_probe_windows,
     "plugins.probeApi": h_plugins_probe_api,
+    "plugins.probeBrowserNav": h_plugins_probe_browser_nav,
+    "plugins.loadViaUI": h_plugins_load_via_ui,
+    "mixer.loadFST": h_mixer_load_fst,
     "plugins.setSlotEnabled": h_plugins_set_slot_enabled,
     "plugins.removeFromSlot": h_plugins_remove_from_slot,
     "plugins.getSlotInfo": h_plugins_get_slot_info,

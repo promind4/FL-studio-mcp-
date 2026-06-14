@@ -147,6 +147,8 @@ threshold_normalized = (dB + 100) / 100.0
 | Enable/disable bouton vert | ✅ | Via `setParamValue(pid=-1)` — stratégie interne FL Studio |
 | Suppression plugin de slot | ❌ | API FL Studio 2025 ne l'expose pas (removeTrackPlugin absent) |
 | Sidechain track 2 → track 6 | ✅ | `mixer.sidechain` active=True, level=0.8 confirmé |
+| Pro-Q 3 EFFET VOIX — activation bandes + EQ | ✅ | HP 80Hz, LowShelf −2dB@200Hz, Bell +2dB@3kHz, HiShelf +2dB@10kHz |
+| **Pro-Q 3 — ajout/retrait de bande via `setParamValue`** | ✅ **2026-06-13** | Écrire idx Used (0/13/26/39…) = 1/0 active/désactive la bande. **AUCUN restart requis.** Voir `LECONS-APPRISES.md` |
 
 ### Calibrations Waves (patterns communs à tous les plugins Waves)
 
@@ -198,6 +200,38 @@ Impossible via API de scripting FL Studio 2025. Seule alternative : automatisati
 
 ---
 
+## Nouvelles fonctionnalités — session 2026-06-13 (suite)
+
+| Feature | Détail |
+|---------|--------|
+| `fl_get_preset_count(track, slot)` | Compte les presets FL Studio disponibles pour un plugin |
+| `fl_load_preset(track, slot, index)` | Charge un preset par index (0-based) — nécessite `plugins.setPreset` absent en FL 2025 |
+| `fl_next_preset(track, slot)` | Cycle au preset suivant — **fonctionne** en FL 2025 via `plugins.nextPreset` |
+| `fl_set_plugin_param_rec` | Désactivé — `general.processRECEvent` avec plugin param event IDs crash FL Studio |
+
+### Workflow Pro-Q 3 — ajout/retrait de bandes (MÉTHODE ACTUELLE)
+
+> ⚠️ **Le workflow par presets `.fst` ci-dessous est OBSOLÈTE.** On a découvert le 2026-06-13
+> que `setParamValue` contrôle directement les bandes. Détails complets : `LECONS-APPRISES.md`.
+
+1. Pour activer une bande N : `fl_set_plugin_params` avec `{"index": (N-1)*13, "value": 1}`
+2. Pour la régler : mêmes batch, offsets +2 (Freq), +3 (Gain), +8 (Shape)
+3. Pour la retirer : `{"index": (N-1)*13, "value": 0}`
+4. **NE PAS vérifier via `fl_get_plugin_param` juste après** — le readback ment quelques secondes
+   (et durablement pour le flag « Used »). Vérifier à l'écran. **Aucun restart FL nécessaire.**
+
+### Approche obsolète (presets `.fst`) — conservée pour mémoire
+
+Avant la découverte ci-dessus, on activait les bandes en chargeant des presets
+`ProQ3_1bands.fst` → `ProQ3_8bands.fst` via `fl_next_preset`. Ça marchait mais c'était lourd
+(cyclage à l'aveugle) et ça reposait sur le mythe « Band Used non-automatable ». Plus nécessaire.
+
+```
+D:\Image-Line\FL Studio\Presets\Plugin presets\Effects\Fruity Wrapper - Pro-Q 3\
+```
+
+---
+
 ## Problèmes connus / Quirks
 
 | Problème | Cause | Solution |
@@ -206,3 +240,8 @@ Impossible via API de scripting FL Studio 2025. Seule alternative : automatisati
 | Pro-Q 3 readback asynchrone | Le plugin n'applique pas les params instantanément | Délai 150–200 ms avant lecture |
 | `setParamValue` silencieux avec `location="channel"` pour mixer | `useGlobal=True` ignore les writes mixer | Toujours utiliser `location="mixer"` |
 | Cache `discover_params` écrit avec `location="channel"` | Ancien comportement (pre-fix) | Effacer `schemas/generated/*.json` si incohérence |
+| ~~Pro-Q 3 `Band N Used` non automatable~~ | **FAUX** — c'était un artefact de readback périmé | `setParamValue` contrôle bien les bandes. Voir `LECONS-APPRISES.md` |
+| Readback `getParamValue` périmé après une écriture | L'API FL ne resynchronise son snapshot qu'après un délai/événement | Vérifier à l'écran, pas par relecture immédiate. Pour le flag « Used » la lecture ment durablement |
+| `plugins.setPreset` absent en FL Studio 2025 | FL 2025 n'implémente pas cette fonction (re-vérifié 2026-06-13) | Utiliser `fl_next_preset`/`prevPreset`, ou mieux `setParamValue` direct |
+| `general.processRECEvent` crash FL Studio | Event ID formula incorrecte pour plugin params | **Ne pas utiliser** — handler désactivé dans le bridge |
+| ~~Writes Pro-Q 3 visibles seulement après restart~~ | **FAUX** — même cause (readback périmé) | **Aucun restart nécessaire.** Les writes s'appliquent immédiatement |

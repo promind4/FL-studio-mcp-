@@ -52,7 +52,7 @@ def get_client():
 def build_server() -> FastMCP:
     mcp = FastMCP("fl-studio-mcp")
 
-    from .tools import export, mixer, plugin_loader
+    from .tools import export, mixer, plugin_loader, fst_loader
     from .tools import plugins as plugin_tools
 
     # --- Connectivity ---------------------------------------------------
@@ -157,6 +157,46 @@ def build_server() -> FastMCP:
     # --- Plugin slot management --------------------------------------------
 
     @mcp.tool()
+    def fl_get_preset_count(track: int, slot: int) -> dict:
+        """Return the number of presets available for the plugin at (track, slot).
+        Use before fl_load_preset to know the valid index range."""
+        return get_client().call("plugins.presetCount", {
+            "index": track, "slot": slot, "location": "mixer",
+        })
+
+    @mcp.tool()
+    def fl_load_preset(track: int, slot: int, preset_index: int) -> dict:
+        """Load a plugin preset by index (0-based).
+        Loading a factory preset is the only reliable way to activate
+        Pro-Q 3 / FabFilter bands without mouse interaction — the preset
+        system sets the full plugin state including 'Band N Used' flags.
+        After loading, override individual params with fl_set_plugin_params."""
+        return get_client().call("plugins.setPreset", {
+            "index": track, "slot": slot, "location": "mixer",
+            "preset": preset_index,
+        })
+
+    @mcp.tool()
+    def fl_next_preset(track: int, slot: int) -> dict:
+        """Advance the plugin at (track, slot) to the next preset."""
+        return get_client().call("plugins.nextPreset", {
+            "index": track, "slot": slot, "location": "mixer",
+        })
+
+    @mcp.tool()
+    def fl_set_plugin_param_rec(track: int, slot: int,
+                                param: int, value: float) -> dict:
+        """Set a plugin parameter via general.processRECEvent (FL REC automation bus).
+        Use this instead of fl_set_plugin_params when the parameter is
+        non-automatable via setParamValue — specifically Pro-Q 3 'Band N Used'
+        (param indices 0, 13, 26, 39, 52, 65, 78, 91).
+        value: normalized 0.0..1.0 (1.0 = band active)."""
+        return get_client().call("plugins.setParamREC", {
+            "index": track, "slot": slot, "location": "mixer",
+            "param": param, "value": value,
+        })
+
+    @mcp.tool()
     def fl_set_slot_enabled(track: int, slot: int, enabled: bool,
                              location: str = "mixer") -> dict:
         """Enable (True) or bypass/disable (False) an FX slot green button.
@@ -211,13 +251,67 @@ def build_server() -> FastMCP:
         enabled state, and peak levels — all in one round-trip."""
         return get_client().call("mixer.fullTrackInfo", {"track": track})
 
+    # --- FST Mixer preset loading -------------------------------------------
+
+    @mcp.tool()
+    def fl_list_mixer_presets() -> dict:
+        """List all saved mixer state presets (.fst files) with their plugin
+        contents. Use this to choose which preset to load onto a track."""
+        return {"presets": fst_loader.list_presets()}
+
+    @mcp.tool()
+    def fl_select_mixer_preset(wanted_plugins: list[str]) -> dict:
+        """Find the mixer preset (.fst) that best matches the requested plugins.
+        wanted_plugins: list of plugin name fragments to match
+        (e.g. ['Pro-Q 3', 'CLA-76', 'Sibilance']).
+        Returns the best matching preset with its path and plugin list."""
+        result = fst_loader.select_preset(wanted_plugins)
+        if result is None:
+            return {"error": "No presets found in catalog"}
+        return result
+
+    @mcp.tool()
+    def fl_deploy_mixer_preset(src_path: str) -> dict:
+        """Copy a mixer preset .fst file to _MCP.fst (the fixed loading slot).
+        Must be called before fl_load_mixer_preset.
+        src_path: absolute path to the .fst file (from fl_select_mixer_preset)."""
+        try:
+            dest = fst_loader.deploy_preset(src_path)
+            return {"ok": True, "deployed_to": dest}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    @mcp.tool()
+    def fl_load_mixer_preset(track: int) -> dict:
+        """Load the deployed _MCP.fst mixer preset onto a mixer track.
+        Navigates the FL Studio browser to _MCP.fst (always first position)
+        and calls selectBrowserMenuItem to insert all plugins at once.
+        Call fl_deploy_mixer_preset first to place the right .fst."""
+        return get_client().call("mixer.loadFST", {"track": track})
+
     # --- Plugin loading -----------------------------------------------------
 
     @mcp.tool()
     def fl_probe_plugin_loading() -> dict:
-        """Check which plugin-loading strategies this FL Studio build
-        supports. Run once before trying to load plugins."""
-        return plugin_loader.probe_capabilities(get_client())
+        """Probe FL Studio window IDs (midi wid* constants + showWindow test)
+        to find the Plugin Picker window for programmatic plugin loading."""
+        return get_client().call("meta.probeWindows")
+
+    @mcp.tool()
+    def fl_probe_all_modules() -> dict:
+        """Return all callable attributes on plugins, mixer and ui modules.
+        Used to discover undocumented loading/removing functions at runtime."""
+        return get_client().call("plugins.probeApi")
+
+    @mcp.tool()
+    def fl_load_plugin_via_ui(track: int, slot: int,
+                              plugin_name: str = "Pro-Q 3") -> dict:
+        """Attempt to load a plugin into a mixer FX slot using FL Studio's
+        UI browser navigation (ui.navigateBrowser / ui.selectBrowserMenuItem).
+        Returns a step-by-step log of what was attempted."""
+        return get_client().call("plugins.loadViaUI", {
+            "track": track, "slot": slot, "plugin_name": plugin_name,
+        })
 
     @mcp.tool()
     def fl_wait_for_plugin(track: int, slot: int, expected: str,

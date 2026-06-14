@@ -1,0 +1,993 @@
+{
+  "ADT.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\ADT.fst",
+    "plugins": [
+      "Reel ADT"
+    ]
+  },
+  "CLARITY.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\CLARITY.fst",
+    "plugins": [
+      "Clarity Vx",
+      "Clarity Vx DeReverb",
+      "NS1",
+      "Vocal Rider",
+      "WaveShell1-VST3 16.2_x64.vst38",
+      "WaveShell1-VST3 16.2_x647"
+    ]
+  },
+  "DELAI DU 24042026.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\DELAI DU 24042026.fst",
+    "plugins": [
+      "C1Comp",
+      "H-Delay",
+      "MetaFlanger",
+      "WaveShell1-VST3 16.0_x64.vst38",
+      "WaveShell1-VST3 16.0_x647"
+    ]
+  },
+  "DELAI.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\DELAI.fst",
+    "plugins": [
+      "C1Comp",
+      "FabFilter Pro-Q 3",
+      "H-Delay"
+    ]
+  },
+  "EFFET 2.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\EFFET 2.fst",
+    "plugins": [
+      "Lil Tube",
+      "MetaFlanger",
+      "Reel ADT"
+    ]
+  },
+  "EFFET MASTERING.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\EFFET MASTERING.fst",
+    "plugins": [
+      "FabFilter Pro-C 2",
+      "FabFilter Pro-Q 3",
+      "SSLComp",
+      "Tonal Balance Control 2",
+      "Vitamin",
+      "WLM",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "EFFET VOCAL 240426.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\EFFET VOCAL 240426.fst",
+    "plugins": [
+      "Auto-Tune",
+      "CLA-76",
+      "FabFilter Pro-Q 3",
+      "PuigTec EQP1A",
+      "RComp",
+      "S1 Imager",
+      "Sibilance",
+      "Smack Attack",
+      "ValhallaSpaceModulator",
+      "WaveShell1-VST3 16.0_x64.vst38",
+      "WaveShell1-VST3 16.0_x647"
+    ]
+  },
+  "EFFET.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\EFFET.fst",
+    "plugins": [
+      "CLA-2A",
+      "CLA-76",
+      "DeEsser",
+      "FabFilter Pro-Q 3",
+      "PuigTec EQP1A",
+      "RComp",
+      "S1 Imager",
+      "Sibilance",
+      "Waves Tune Real-Time"
+    ]
+  },
+  "REVERB 1 DU 240426.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\REVERB 1 DU 240426.fst",
+    "plugins": [
+      "C1Comp",
+      "FabFilter Pro-C 2",
+      "FabFilter Pro-Q 3",
+      "FabFilter Pro-R",
+      "LALA",
+      "ValhallaSpaceModulator",
+      "WaveShell1-VST3 16.0_x64.vst38",
+      "WaveShell1-VST3 16.0_x647"
+    ]
+  },
+  "REVERB 2 DU 240426.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\REVERB 2 DU 240426.fst",
+    "plugins": [
+      "FabFilter Pro-R",
+      "RVerb",
+      "WaveShell1-VST3 16.0_x64.vst38",
+      "WaveShell1-VST3 16.0_x647"
+    ]
+  },
+  "REVERB 22.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\REVERB 22.fst",
+    "plugins": [
+      "FabFilter Pro-Q 3",
+      "FabFilter Pro-R"
+    ]
+  },
+  "VOIX CLARTE.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\VOIX CLARTE.fst",
+    "plugins": [
+      "Auto-Tune",
+      "Clarity Vx DeReverb",
+      "Clarity Vx Pro",
+      "J37",
+      "NS1",
+      "Vocal Rider",
+      "WaveShell1-VST3 16.0_x64.vst38",
+      "WaveShell1-VST3 16.0_x647",
+      "WaveShell1-VST3 16.2_x64.vst38",
+      "WaveShell1-VST3 16.2_x647",
+      "X-Noise"
+    ]
+  },
+  "VOIX ET EFFET STEREO.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\VOIX ET EFFET STEREO.fst",
+    "plugins": [
+      "Aphex AX",
+      "Greg Wells VoiceCentric",
+      "LoAir"
+    ]
+  },
+  "VOIX ET EFFET.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\VOIX ET EFFET.fst",
+    "plugins": [
+      "API-2500",
+      "Aphex AX",
+      "CLA-2A",
+      "CLA-76",
+      "FabFilter Pro-Q 3",
+      "Lil Tube",
+      "PuigTec EQP1A",
+      "Sibilance",
+      "Smack Attack",
+      "WaveShell1-VST3 16.0_x64.vst38",
+      "WaveShell1-VST3 16.0_x647"
+    ]
+  },
+  "bf.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\bf.fst",
+    "plugins": []
+  },
+  "Mixer presets/1 CORRECTION VOCAL.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\1 CORRECTION VOCAL.fst",
+    "plugins": [
+      "Auto-Tune",
+      "CLA-2A",
+      "Clarity Vx DeReverb",
+      "Clarity Vx Pro",
+      "FabFilter Pro-Q 3",
+      "J37",
+      "NS1",
+      "Vocal Rider",
+      "WaveShell1-VST3 16.0_x64.vst38",
+      "WaveShell1-VST3 16.0_x647",
+      "X-Noise"
+    ]
+  },
+  "Mixer presets/11 ADLIB.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\11 ADLIB.fst",
+    "plugins": [
+      "CLA-76",
+      "Doubler",
+      "FabFilter Pro-Q 3",
+      "H-Delay",
+      "H-Reverb",
+      "NS1",
+      "OneKnobOKDriver",
+      "ParallelRack",
+      "PuigTec EQP1A",
+      "RComp",
+      "RDeEsser",
+      "S1 Imager",
+      "SSLChannel",
+      "Sibilance",
+      "StudioRack",
+      "ValhallaSpaceModulator",
+      "Vocal Rider",
+      "WaveShell1-VST3 14.21_x64.vst38",
+      "WaveShell1-VST3 14.21_x647",
+      "WaveShell1-VST3 16.0_x64.vst38",
+      "WaveShell1-VST3 16.0_x647"
+    ]
+  },
+  "Mixer presets/2 GLOW VOCAL.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\2 GLOW VOCAL.fst",
+    "plugins": [
+      "Auto-Tune",
+      "CLA-76",
+      "FabFilter Pro-Q 3",
+      "PuigTec EQP1A",
+      "RComp",
+      "Sibilance",
+      "Smack Attack",
+      "ValhallaSpaceModulator",
+      "WaveShell1-VST3 16.0_x64.vst38",
+      "WaveShell1-VST3 16.0_x647"
+    ]
+  },
+  "Mixer presets/2312.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\2312.fst",
+    "plugins": [
+      "Clarity Vx DeReverb",
+      "FabFilter Pro-Q 3",
+      "J37",
+      "MannyM-Reverb",
+      "NLS",
+      "NS1",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/2412.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\2412.fst",
+    "plugins": [
+      "CLA-2A",
+      "CLA-76",
+      "PuigTec EQP1A",
+      "REQ",
+      "Renaissance Vox",
+      "Sibilance",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647",
+      "Waves Tune Real-Time"
+    ]
+  },
+  "Mixer presets/3 EFFET VOCAL.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\3 EFFET VOCAL.fst",
+    "plugins": [
+      "FabFilter Pro-Q 3",
+      "Lil Tube",
+      "S1 Imager",
+      "ValhallaSpaceModulator",
+      "WaveShell1-VST3 16.0_x64.vst38",
+      "WaveShell1-VST3 16.0_x647"
+    ]
+  },
+  "Mixer presets/4 REVERB HALL.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\4 REVERB HALL.fst",
+    "plugins": [
+      "C1Comp",
+      "FabFilter Pro-C 2",
+      "FabFilter Pro-Q 3",
+      "FabFilter Pro-R",
+      "LALA",
+      "ValhallaSpaceModulator",
+      "WaveShell1-VST3 16.0_x64.vst38",
+      "WaveShell1-VST3 16.0_x647"
+    ]
+  },
+  "Mixer presets/A CORRECT VOIX 2008.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\A CORRECT VOIX 2008.fst",
+    "plugins": [
+      "Clarity Vx DeReverb Pro",
+      "Clarity Vx Pro",
+      "J37",
+      "NS1",
+      "Vocal Rider",
+      "WaveShell1-VST3 16.0_x64.vst38",
+      "WaveShell1-VST3 16.0_x647",
+      "X-Noise"
+    ]
+  },
+  "Mixer presets/A EFFET VOIX 2008.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\A EFFET VOIX 2008.fst",
+    "plugins": [
+      "API-2500",
+      "Auto-Tune",
+      "BB Tubes",
+      "CLA-2A",
+      "CLA-76",
+      "DeEsser",
+      "FabFilter Pro-Q 3",
+      "PuigTec EQP1A",
+      "S1 Imager",
+      "ValhallaSpaceModulator",
+      "WaveShell1-VST3 16.0_x64.vst38",
+      "WaveShell1-VST3 16.0_x647"
+    ]
+  },
+  "Mixer presets/ADLIB 1306.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\ADLIB 1306.fst",
+    "plugins": [
+      "Auto-Tune",
+      "CLA-2A",
+      "CLA-76",
+      "FabFilter Pro-Q 3",
+      "Lil Tube",
+      "MannyM-Distortion",
+      "PuigTec EQP1A",
+      "Sibilance",
+      "Space Rider",
+      "ValhallaSpaceModulator",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/ASTRO VOCAL 1.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\ASTRO VOCAL 1.fst",
+    "plugins": [
+      "GTR Stomp",
+      "H-Delay",
+      "StompCompressor",
+      "StompReverb",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/ASTRO VOCAL 2.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\ASTRO VOCAL 2.fst",
+    "plugins": [
+      "GTR Stomp",
+      "H-Delay",
+      "StompCompressor",
+      "StompReverb",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/ASTRO VOCAL 3.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\ASTRO VOCAL 3.fst",
+    "plugins": [
+      "H-Delay",
+      "MetaFlanger",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/ASTRO VOCAL 4.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\ASTRO VOCAL 4.fst",
+    "plugins": [
+      "DeEsser",
+      "H-Delay",
+      "PuigTec EQP1A",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/ASTRO VOCAL 5.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\ASTRO VOCAL 5.fst",
+    "plugins": [
+      "DeEsser",
+      "TrueVerb",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/ASTRO VOCAL 6.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\ASTRO VOCAL 6.fst",
+    "plugins": [
+      "DeEsser",
+      "GTR Stomp",
+      "RVerb",
+      "StompVibrolo",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/CLEAN VOC 11.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\CLEAN VOC 11.fst",
+    "plugins": [
+      "Auto-Tune",
+      "Clarity Vx",
+      "Clarity Vx DeReverb",
+      "FabFilter Pro-Q 3",
+      "J37",
+      "MannyM-Reverb",
+      "NLS",
+      "NS1",
+      "Vocal Rider",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647",
+      "Waves Tune Real-Time"
+    ]
+  },
+  "Mixer presets/CORRECT VOIX 2008.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\CORRECT VOIX 2008.fst",
+    "plugins": [
+      "Clarity Vx DeReverb Pro",
+      "Clarity Vx Pro",
+      "J37",
+      "NS1",
+      "Vocal Rider",
+      "WaveShell1-VST3 16.0_x64.vst38",
+      "WaveShell1-VST3 16.0_x647",
+      "X-Noise"
+    ]
+  },
+  "Mixer presets/CORRECT VOX 3105.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\CORRECT VOX 3105.fst",
+    "plugins": [
+      "CLA-2A",
+      "Clarity Vx Pro",
+      "FabFilter Pro-Q 3",
+      "NS1",
+      "Vocal Rider",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/CORRECT VOX 31052025.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\CORRECT VOX 31052025.fst",
+    "plugins": [
+      "Auto-Tune",
+      "BB Tubes",
+      "CLA-2A",
+      "FabFilter Pro-Q 3",
+      "PuigTec EQP1A",
+      "Renaissance Vox",
+      "S1 Imager",
+      "Sibilance",
+      "ValhallaSpaceModulator",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/DELAYY.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\DELAYY.fst",
+    "plugins": [
+      "C1Comp",
+      "H-Delay",
+      "MetaFlanger",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/DOUBLER 11.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\DOUBLER 11.fst",
+    "plugins": [
+      "Doubler",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/EFFET COULPET 1.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\EFFET COULPET 1.fst",
+    "plugins": [
+      "Auto-Tune",
+      "FabFilter Pro-C 2",
+      "FabFilter Pro-DS",
+      "FabFilter Pro-G",
+      "FabFilter Pro-Q 3",
+      "FabFilter Saturn 2",
+      "ValhallaSpaceModulator"
+    ]
+  },
+  "Mixer presets/EFFET RECORD 18052025.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\EFFET RECORD 18052025.fst",
+    "plugins": [
+      "Auto-Tune",
+      "Clarity Vx DeReverb Pro",
+      "FabFilter Pro-Q 3",
+      "NS1",
+      "Vocal Rider",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/EFFET VOC 22.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\EFFET VOC 22.fst",
+    "plugins": [
+      "CLA-2A",
+      "CLA-76",
+      "DeEsser",
+      "FabFilter Pro-MB",
+      "FabFilter Pro-Q 3",
+      "Lil Tube",
+      "PuigTec EQP1A",
+      "SSLComp",
+      "Sibilance",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/Effet couplet 31052025.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\Effet couplet 31052025.fst",
+    "plugins": [
+      "Auto-Tune",
+      "BB Tubes",
+      "CLA-2A",
+      "FabFilter Pro-Q 3",
+      "PuigTec EQP1A",
+      "Renaissance Vox",
+      "S1 Imager",
+      "Sibilance",
+      "ValhallaSpaceModulator",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/HOLY GRAIL REVERB é.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\HOLY GRAIL REVERB é.fst",
+    "plugins": [
+      "CLA Epic",
+      "RComp",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/HOLY grail evo.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\HOLY grail evo.fst",
+    "plugins": [
+      "CLA-76",
+      "L3-LL",
+      "RDeEsser",
+      "Renaissance Vox",
+      "Scheps 73",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/MANNY M BACKING.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\MANNY M BACKING.fst",
+    "plugins": [
+      "Kramer PIE",
+      "MannyM-Delay",
+      "MannyM-EQ",
+      "MannyM-Reverb",
+      "MannyM-ToneShaper",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/MELODIC RAP LEAD PRESET.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\MELODIC RAP LEAD PRESET.fst",
+    "plugins": [
+      "CLA-2A",
+      "DeEsser",
+      "FabFilter Pro-Q 3",
+      "GTR Stomp",
+      "MannyM-TripleD",
+      "REQ",
+      "Renaissance Vox",
+      "StompGate",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647",
+      "Waves Tune Real-Time"
+    ]
+  },
+  "Mixer presets/MIX DELAY1.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\MIX DELAY1.fst",
+    "plugins": [
+      "C1Comp",
+      "H-Delay",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/MIX REVERB 1.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\MIX REVERB 1.fst",
+    "plugins": [
+      "FabFilter Pro-R",
+      "RVerb",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/MIX REVERB 2.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\MIX REVERB 2.fst",
+    "plugins": [
+      "FabFilter Pro-C 2",
+      "FabFilter Pro-Q 3",
+      "FabFilter Pro-R",
+      "LALA",
+      "ValhallaSpaceModulator"
+    ]
+  },
+  "Mixer presets/MIX VOC 1.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\MIX VOC 1.fst",
+    "plugins": [
+      "Auto-Tune",
+      "Clarity Vx",
+      "Clarity Vx DeReverb",
+      "FabFilter Pro-Q 3",
+      "J37",
+      "MannyM-Reverb",
+      "NLS",
+      "NS1",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647",
+      "Waves Tune Real-Time"
+    ]
+  },
+  "Mixer presets/MIX VOC 2.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\MIX VOC 2.fst",
+    "plugins": [
+      "BB Tubes",
+      "CLA-2A",
+      "CLA-76",
+      "FabFilter Pro-MB",
+      "PuigTec EQP1A",
+      "Renaissance Vox",
+      "SSLChannel",
+      "Sibilance",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/PRESTON REID ADLIB EXTRAWIDE.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\PRESTON REID ADLIB EXTRAWIDE.fst",
+    "plugins": [
+      "CLA Vocals",
+      "DeEsser",
+      "Doubler",
+      "Q10",
+      "Renaissance Vox",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/PRESTON REID ADLIB FIRE.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\PRESTON REID ADLIB FIRE.fst",
+    "plugins": [
+      "CLA Vocals",
+      "DeEsser",
+      "Q10",
+      "Renaissance Vox",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/PRESTON REID ADLIB TREBLE.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\PRESTON REID ADLIB TREBLE.fst",
+    "plugins": [
+      "CLA Vocals",
+      "DeEsser",
+      "Q10",
+      "Renaissance Vox",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/PRESTON REID ADLIB WIDE.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\PRESTON REID ADLIB WIDE.fst",
+    "plugins": [
+      "CLA Vocals",
+      "CLA-76",
+      "DeEsser",
+      "Doubler",
+      "Q10",
+      "Renaissance Vox",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/Preston reid vocal clean claire preset.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\Preston reid vocal clean claire preset.fst",
+    "plugins": [
+      "PuigTec EQP1A",
+      "SSLEQ",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/REVERB CHAMBER 1.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\REVERB CHAMBER 1.fst",
+    "plugins": [
+      "FabFilter Pro-R",
+      "RVerb",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/REVERB DE LOIN.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\REVERB DE LOIN.fst",
+    "plugins": [
+      "FabFilter Pro-C 2",
+      "FabFilter Pro-Q 3",
+      "FabFilter Pro-R",
+      "LALA",
+      "ValhallaSpaceModulator"
+    ]
+  },
+  "Mixer presets/REVERB DE PRES.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\REVERB DE PRES.fst",
+    "plugins": [
+      "FabFilter Pro-R",
+      "RVerb",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/REVERB HALL 1.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\REVERB HALL 1.fst",
+    "plugins": [
+      "FabFilter Pro-C 2",
+      "FabFilter Pro-Q 3",
+      "FabFilter Pro-R",
+      "LALA",
+      "ValhallaSpaceModulator"
+    ]
+  },
+  "Mixer presets/REVERB HALL.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\REVERB HALL.fst",
+    "plugins": [
+      "FabFilter Pro-C 2",
+      "FabFilter Pro-Q 3",
+      "FabFilter Pro-R",
+      "LALA",
+      "ValhallaSpaceModulator"
+    ]
+  },
+  "Mixer presets/REVERB HOLY GRAIL EVO.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\REVERB HOLY GRAIL EVO.fst",
+    "plugins": [
+      "CLA Epic",
+      "RComp",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/TEEZIO vox chain preset.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\TEEZIO vox chain preset.fst",
+    "plugins": [
+      "CLA-3A",
+      "OneKnobBrighter",
+      "PuigTec EQP1A",
+      "RComp",
+      "REQ",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/TRAIN EFFET.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\TRAIN EFFET.fst",
+    "plugins": [
+      "CLA-2A",
+      "CLA-76",
+      "Doubler",
+      "FabFilter Pro-DS",
+      "FabFilter Saturn 2",
+      "ValhallaSpaceModulator",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/TRAIN REC.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\TRAIN REC.fst",
+    "plugins": [
+      "CLA-2A",
+      "FabFilter Pro-Q 3",
+      "NS1",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647",
+      "Waves Tune Real-Time"
+    ]
+  },
+  "Mixer presets/TRAIN VOIC.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\TRAIN VOIC.fst",
+    "plugins": [
+      "CLA-2A",
+      "CLA-76",
+      "FabFilter Pro-DS",
+      "FabFilter Pro-MB",
+      "FabFilter Pro-Q 3",
+      "NS1",
+      "PuigTec EQP1A",
+      "SSLEQ",
+      "Sibilance",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/VOC AO BACK 2.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\VOC AO BACK 2.fst",
+    "plugins": [
+      "Auto-Tune",
+      "BB Tubes",
+      "CLA-2A",
+      "FabFilter Pro-Q 3",
+      "PuigTec EQP1A",
+      "Renaissance Vox",
+      "S1 Imager",
+      "Sibilance",
+      "ValhallaSpaceModulator",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/VOC AO BACK.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\VOC AO BACK.fst",
+    "plugins": [
+      "CLA-2A",
+      "Clarity Vx Pro",
+      "FabFilter Pro-Q 3",
+      "NS1",
+      "Vocal Rider",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/VOC EFFECT 26052025.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\VOC EFFECT 26052025.fst",
+    "plugins": [
+      "BB Tubes",
+      "CLA-2A",
+      "FabFilter Pro-Q 3",
+      "NS1",
+      "PuigTec EQP1A",
+      "Renaissance Vox",
+      "S1 Imager",
+      "Sibilance",
+      "ValhallaSpaceModulator",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/WAVE CLEAN.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\WAVE CLEAN.fst",
+    "plugins": [
+      "CLA-76",
+      "DeEsser",
+      "Doubler",
+      "FabFilter Pro-Q 3",
+      "MV2",
+      "MaxxBass",
+      "Renaissance Vox",
+      "SSLChannel",
+      "Vitamin",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/WAVE RECORD.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\WAVE RECORD.fst",
+    "plugins": [
+      "NS1",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647",
+      "Waves Tune Real-Time"
+    ]
+  },
+  "Mixer presets/WIDE DUBZ  REVERB.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\WIDE DUBZ  REVERB.fst",
+    "plugins": [
+      "Abbey Road Chambers",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/WIDE DUBZ SEAN BACK SEAN.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\WIDE DUBZ SEAN BACK SEAN.fst",
+    "plugins": [
+      "C1Gate",
+      "CLA Effects",
+      "DeEsser",
+      "SSL EV2 Channel",
+      "Vitamin",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/WIDE DUBZ doubler4.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\WIDE DUBZ doubler4.fst",
+    "plugins": [
+      "Doubler",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/Yung guru adlib preset.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\Yung guru adlib preset.fst",
+    "plugins": [
+      "CLA Vocals",
+      "DeEsser",
+      "RComp",
+      "REQ",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/Yung guru lead vocal preset.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\Yung guru lead vocal preset.fst",
+    "plugins": [
+      "CLA Vocals",
+      "CLA-2A",
+      "DeEsser",
+      "RComp",
+      "REQ",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647",
+      "Waves Tune Real-Time"
+    ]
+  },
+  "Mixer presets/ad lead magique.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\ad lead magique.fst",
+    "plugins": [
+      "Auto-Tune",
+      "FabFilter Pro-C 2",
+      "FabFilter Pro-DS",
+      "FabFilter Pro-G",
+      "FabFilter Pro-Q 3",
+      "FabFilter Saturn 2",
+      "ValhallaSpaceModulator"
+    ]
+  },
+  "Mixer presets/back magique.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\back magique.fst",
+    "plugins": [
+      "Auto-Tune",
+      "FabFilter Pro-C 2",
+      "FabFilter Pro-DS",
+      "FabFilter Pro-G",
+      "FabFilter Pro-Q 3",
+      "FabFilter Pro-R",
+      "FabFilter Saturn 2",
+      "ValhallaSpaceModulator"
+    ]
+  },
+  "Mixer presets/back.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\back.fst",
+    "plugins": [
+      "FabFilter Pro-C 2",
+      "FabFilter Pro-Q 3",
+      "FabFilter Pro-R",
+      "LALA",
+      "ValhallaSpaceModulator"
+    ]
+  },
+  "Mixer presets/clean magique.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\clean magique.fst",
+    "plugins": [
+      "Auto-Tune",
+      "FabFilter Pro-C 2",
+      "FabFilter Pro-DS",
+      "FabFilter Pro-G",
+      "FabFilter Pro-Q 3",
+      "FabFilter Saturn 2",
+      "ValhallaSpaceModulator"
+    ]
+  },
+  "Mixer presets/master 1206.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\master 1206.fst",
+    "plugins": [
+      "AR TG Meter Bridge",
+      "FabFilter Pro-C 2",
+      "FabFilter Pro-Q 3",
+      "SSLComp",
+      "Tonal Balance Control 2",
+      "Vitamin",
+      "WLM",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  },
+  "Mixer presets/reveb magique.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\reveb magique.fst",
+    "plugins": [
+      "FabFilter Pro-C 2",
+      "FabFilter Pro-Q 3",
+      "FabFilter Pro-R",
+      "LALA",
+      "ValhallaSpaceModulator"
+    ]
+  },
+  "Mixer presets/reverb lead magique.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\reverb lead magique.fst",
+    "plugins": [
+      "FabFilter Pro-C 2",
+      "FabFilter Pro-R"
+    ]
+  },
+  "Mixer presets/yOAD NEVO ESSENTIEL BACKING.fst": {
+    "path": "D:\\Image-Line\\FL Studio\\Presets\\Mixer presets\\Mixer presets\\yOAD NEVO ESSENTIEL BACKING.fst",
+    "plugins": [
+      "Doubler",
+      "REQ",
+      "RenAxx",
+      "Sibilance",
+      "TrueVerb",
+      "WaveShell1-VST3 15.0_x64.vst38",
+      "WaveShell1-VST3 15.0_x647"
+    ]
+  }
+}

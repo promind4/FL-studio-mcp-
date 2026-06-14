@@ -86,7 +86,7 @@ class MidiBridgeClient:
 
     def __init__(self, to_fl_hint: str = PORT_TO_FL,
                  from_fl_hint: str = PORT_FROM_FL,
-                 timeout: float = 20.0,
+                 timeout: float = 90.0,
                  _out_port=None, _in_port=None):
         self.to_fl_hint = to_fl_hint
         self.from_fl_hint = from_fl_hint
