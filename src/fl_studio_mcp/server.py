@@ -466,6 +466,39 @@ def build_server() -> FastMCP:
         Call once at the start of a mixing session."""
         return get_client().call("project.metadata")
 
+    # --- Transport control (BPM / time signature) ---------------------------
+
+    @mcp.tool()
+    def fl_set_bpm(bpm: float) -> dict:
+        """Set the project tempo in BPM.
+        Accepted range: 10–999 BPM. Changes are immediate and undoable.
+        Use fl_get_project_info to read the current tempo first."""
+        return get_client().call("transport.setTempo", {"bpm": bpm})
+
+    @mcp.tool()
+    def fl_set_time_signature(numerator: int, denominator: int) -> dict:
+        """Set the project time signature.
+        Common values: 4/4, 3/4, 6/8, 5/4.
+        numerator: beats per bar (1–16). denominator: beat unit (2, 4, 8, 16)."""
+        return get_client().call("transport.setTimeSignature",
+                                 {"numerator": numerator, "denominator": denominator})
+
+    # --- Channel Rack -------------------------------------------------------
+
+    @mcp.tool()
+    def fl_get_channel_rack_info() -> dict:
+        """List all channels in the Channel Rack: name, color, volume, pan,
+        mute/solo state, FX track assignment, and plugin type.
+        Use to identify which instruments are loaded and how they route to
+        the Mixer. Call fl_list_tracks for the Mixer side."""
+        return get_client().call("channels.all")
+
+    @mcp.tool()
+    def fl_get_channel_info(index: int) -> dict:
+        """Get detailed info for a single Channel Rack channel by index.
+        Faster than fl_get_channel_rack_info when you only need one channel."""
+        return get_client().call("channels.info", {"index": index})
+
     # --- User feedback ------------------------------------------------------
 
     @mcp.tool()
@@ -498,6 +531,7 @@ def build_server() -> FastMCP:
                 "fl_ping",
                 "fl_get_project_info",
                 "fl_list_tracks",
+                "fl_get_channel_rack_info",
             ],
             "priority_rules": [
                 "1. Always ping + get project info first.",
