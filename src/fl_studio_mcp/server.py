@@ -345,6 +345,227 @@ def build_server() -> FastMCP:
         recording, when the running build exposes it."""
         return export.set_record_arm(get_client(), track, armed)
 
+    # --- Native mixer EQ (built-in 3-band, no plugin needed) ----------------
+
+    @mcp.tool()
+    def fl_get_native_eq(track: int) -> dict:
+        """Read FL Studio's built-in 3-band mixer EQ for a track.
+        Every mixer track has this EQ regardless of loaded plugins.
+        Use for quick A/B or basic corrections; use fl_set_plugin_params
+        on Pro-Q 3 for precision work. Returns raw FL values — probe first
+        to understand the scale (Hz/dB or normalized)."""
+        return get_client().call("mixer.getEQ", {"track": track})
+
+    @mcp.tool()
+    def fl_set_native_eq_band(track: int, band: int,
+                               frequency: float | None = None,
+                               gain: float | None = None,
+                               bandwidth: float | None = None) -> dict:
+        """Set a band on FL Studio's built-in mixer EQ.
+        band: 0=low shelf, 1=mid parametric, 2=high shelf.
+        Call fl_get_native_eq first to see current values and infer scale.
+        For precision multi-band EQ prefer fl_set_plugin_params on Pro-Q 3."""
+        p: dict = {"track": track, "band": band}
+        if frequency is not None:
+            p["frequency"] = frequency
+        if gain is not None:
+            p["gain"] = gain
+        if bandwidth is not None:
+            p["bandwidth"] = bandwidth
+        return get_client().call("mixer.setEQBand", p)
+
+    # --- Plugin wet/dry mix level -------------------------------------------
+
+    @mcp.tool()
+    def fl_get_plugin_mix_level(track: int, slot: int) -> dict:
+        """Read the wet/dry mix ratio of an FX slot (0.0=dry, 1.0=full wet).
+        Useful before parallel processing to know the current blend."""
+        return get_client().call("mixer.pluginMixLevel",
+                                 {"track": track, "slot": slot})
+
+    @mcp.tool()
+    def fl_set_plugin_mix_level(track: int, slot: int, level: float) -> dict:
+        """Set the wet/dry blend of an FX slot plugin.
+        level: 0.0 (100% dry) … 0.5 (50/50 parallel) … 1.0 (100% wet).
+        Classic use: parallel compression — set compressor slot to 0.5."""
+        return get_client().call("mixer.pluginMixLevel",
+                                 {"track": track, "slot": slot, "level": level})
+
+    # --- FX chain bypass (all slots) ----------------------------------------
+
+    @mcp.tool()
+    def fl_set_track_slots_enabled(track: int, enabled: bool) -> dict:
+        """Enable (True) or bypass (False) ALL FX slots on a mixer track.
+        Faster than toggling slots one by one. Use to A/B the full FX chain.
+        To toggle a single slot use fl_set_slot_enabled instead."""
+        return get_client().call("mixer.trackSlotsEnabled",
+                                 {"track": track, "enabled": enabled})
+
+    # --- Stereo & polarity tools --------------------------------------------
+
+    @mcp.tool()
+    def fl_get_track_stereo(track: int) -> dict:
+        """Read stereo controls: separation, polarity inversion, L/R swap."""
+        return get_client().call("mixer.stereoAdvanced", {"track": track})
+
+    @mcp.tool()
+    def fl_set_track_stereo(track: int,
+                             stereo_sep: float | None = None,
+                             rev_polarity: bool | None = None,
+                             swap_channels: bool | None = None) -> dict:
+        """Set stereo controls for a mixer track.
+        stereo_sep: FL's stereo separation value (probe to confirm range).
+        rev_polarity: True = invert phase (fixes comb filtering between mics).
+        swap_channels: True = swap L/R (fixes reversed stereo).
+        Omit any param to leave it unchanged."""
+        p: dict = {"track": track}
+        if stereo_sep is not None:
+            p["stereo_sep"] = stereo_sep
+        if rev_polarity is not None:
+            p["rev_polarity"] = rev_polarity
+        if swap_channels is not None:
+            p["swap_channels"] = swap_channels
+        return get_client().call("mixer.stereoAdvanced", p)
+
+    # --- Undo / redo --------------------------------------------------------
+
+    @mcp.tool()
+    def fl_undo(steps: int = 1) -> dict:
+        """Undo the last N actions in FL Studio (default: 1).
+        Call immediately if a parameter change sounded wrong or caused issues.
+        Multiple steps = multiple sequential undos."""
+        results = []
+        for _ in range(max(1, steps)):
+            results.append(get_client().call("project.undo"))
+        return {"ok": True, "steps_undone": steps}
+
+    @mcp.tool()
+    def fl_redo() -> dict:
+        """Redo the last undone FL Studio action."""
+        return get_client().call("project.redo")
+
+    @mcp.tool()
+    def fl_get_undo_history() -> dict:
+        """Read the FL Studio undo history: count, position, last entry hint."""
+        return get_client().call("project.undoHistory")
+
+    # --- Project info -------------------------------------------------------
+
+    @mcp.tool()
+    def fl_get_project_info() -> dict:
+        """Full project snapshot: title, author, genre, tempo, FL version,
+        track/channel/pattern counts, play state, unsaved-changes flag.
+        Call once at the start of a mixing session."""
+        return get_client().call("project.metadata")
+
+    # --- User feedback ------------------------------------------------------
+
+    @mcp.tool()
+    def fl_show_notification(message: str) -> dict:
+        """Display a short notification bubble in FL Studio's UI.
+        Use to keep the user informed: 'Applying EQ to VOCAL PRINCIPAL',
+        'Compression set on ADLIB', etc. Max ~80 chars for readability."""
+        return get_client().call("ui.showNotification", {"message": message})
+
+    # --- Browser structure probe --------------------------------------------
+
+    @mcp.tool()
+    def fl_probe_browser_structure() -> dict:
+        """Map FL Studio's browser tab and section structure.
+        Tests navigateBrowserTabs and navigateBrowserMenu to find how many
+        steps reach the Mixer presets section — key for fast FST loading.
+        Run once; leaves browser positioned at Mixer presets if found."""
+        return get_client().call("browser.probeNav")
+
+    # --- Tool guide (LLM navigation map) ------------------------------------
+
+    @mcp.tool()
+    def fl_tool_guide() -> dict:
+        """Navigation map for all FL Studio MCP tools — call once at session
+        start to understand priorities and use cases.
+        Acts as a sitemap: which tools to call first, which to prefer."""
+        return {
+            "version": "0.2.0",
+            "session_start_sequence": [
+                "fl_ping",
+                "fl_get_project_info",
+                "fl_list_tracks",
+            ],
+            "priority_rules": [
+                "1. Always ping + get project info first.",
+                "2. Use fl_get_full_track_info to see what plugins are loaded on a track.",
+                "3. EQ: fl_set_plugin_params (Pro-Q 3) for precision; "
+                   "fl_set_native_eq_band for quick/built-in.",
+                "4. Compression parallel: fl_set_plugin_mix_level (wet/dry blend).",
+                "5. Bypass chain: fl_set_track_slots_enabled (all) or "
+                   "fl_set_slot_enabled (one slot).",
+                "6. Phase issues: fl_set_track_stereo(rev_polarity=True).",
+                "7. Always fl_show_notification before long operations.",
+                "8. On mistake: fl_undo immediately.",
+            ],
+            "categories": {
+                "1_session_start": {
+                    "priority": 1,
+                    "tools": ["fl_ping", "fl_get_project_info", "fl_list_tracks",
+                              "fl_get_full_track_info"],
+                },
+                "2_mixing_core": {
+                    "priority": 2,
+                    "tools": ["fl_set_track_volume", "fl_set_track_pan",
+                              "fl_set_plugin_params", "fl_set_native_eq_band",
+                              "fl_get_native_eq", "fl_set_plugin_mix_level",
+                              "fl_get_plugin_mix_level"],
+                },
+                "3_fx_slots": {
+                    "priority": 3,
+                    "tools": ["fl_set_slot_enabled", "fl_set_track_slots_enabled",
+                              "fl_get_slot_info", "fl_remove_plugin"],
+                },
+                "4_stereo_spatial": {
+                    "priority": 4,
+                    "tools": ["fl_set_track_stereo", "fl_get_track_stereo",
+                              "fl_set_track_pan"],
+                },
+                "5_routing": {
+                    "priority": 5,
+                    "tools": ["fl_set_sidechain", "fl_get_route_info"],
+                },
+                "6_safety_feedback": {
+                    "priority": 6,
+                    "tools": ["fl_undo", "fl_redo", "fl_show_notification",
+                              "fl_get_undo_history"],
+                },
+                "7_discovery": {
+                    "priority": 7,
+                    "tools": ["fl_discover_plugin_params", "fl_list_available_plugins",
+                              "fl_get_track_peaks", "fl_get_plugin_param"],
+                },
+                "8_preset_loading": {
+                    "priority": 8,
+                    "tools": ["fl_list_mixer_presets", "fl_select_mixer_preset",
+                              "fl_deploy_mixer_preset", "fl_load_mixer_preset"],
+                    "note": "Requires template or FST preset; may timeout on browser nav.",
+                },
+            },
+            "pro_q3_reference": {
+                "band_index_formula": "base = (band_number - 1) * 13",
+                "offsets": {
+                    "+0": "Band Used (0=off, 1=on)",
+                    "+1": "Band Enabled",
+                    "+2": "Frequency (norm: log10(hz/10)/log10(3000))",
+                    "+3": "Gain (norm: 0.5 + dB/60)",
+                    "+7": "Q",
+                    "+8": "Shape (Bell=0, LowShelf=0.10, LowCut=0.25, "
+                          "HighShelf=0.375, HighCut=0.45)",
+                },
+                "readback_warning": (
+                    "getParamValue returns stale values after writes. "
+                    "A write returning 'applied' succeeded — verify visually, "
+                    "not by re-reading."
+                ),
+            },
+        }
+
     return mcp
 
 

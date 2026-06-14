@@ -1021,6 +1021,72 @@ def h_mixer_link_channel(p):
     return {"channel": ch, "track": tr}
 
 
+def h_mixer_plugin_mix_level(p):
+    """Read or write the wet/dry mix level of an FX slot plugin.
+    level: 0.0 = 100% dry, 1.0 = 100% wet. Omit to read only."""
+    track = int(p.get("track", 1))
+    slot = int(p.get("slot", 0))
+    if "level" in p:
+        try:
+            mixer.setPluginMixLevel(track, slot, float(p["level"]))
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+    try:
+        level = mixer.getPluginMixLevel(track, slot)
+        return {"ok": True, "track": track, "slot": slot, "mix_level": level}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def h_mixer_track_slots_enabled(p):
+    """Enable or bypass ALL FX slots on a mixer track at once.
+    enabled=True → all slots active; enabled=False → all bypassed.
+    Omit 'enabled' to read current state."""
+    track = int(p.get("track", 1))
+    if "enabled" in p:
+        try:
+            mixer.enableTrackSlots(track, bool(p["enabled"]))
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+    try:
+        return {"ok": True, "track": track,
+                "slots_enabled": bool(mixer.isTrackSlotsEnabled(track))}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def h_mixer_stereo_advanced(p):
+    """Read/write polarity inversion and L/R swap for a mixer track.
+    Pass rev_polarity=True/False or swap_channels=True/False to set;
+    omit to read only. Always returns current state."""
+    track = int(p.get("track", 1))
+    if "rev_polarity" in p:
+        try:
+            want = bool(p["rev_polarity"])
+            if bool(mixer.isTrackRevPolarity(track)) != want:
+                mixer.revTrackPolarity(track)
+        except Exception as e:
+            return {"ok": False, "error": "rev_polarity: " + str(e)}
+    if "swap_channels" in p:
+        try:
+            want = bool(p["swap_channels"])
+            if bool(mixer.isTrackSwapChannels(track)) != want:
+                mixer.swapTrackChannels(track)
+        except Exception as e:
+            return {"ok": False, "error": "swap_channels: " + str(e)}
+    result = {"ok": True, "track": track}
+    for key, fn in [
+        ("stereo_sep",   lambda: mixer.getTrackStereoSep(track)),
+        ("rev_polarity", lambda: bool(mixer.isTrackRevPolarity(track))),
+        ("swap_channels", lambda: bool(mixer.isTrackSwapChannels(track))),
+    ]:
+        try:
+            result[key] = fn()
+        except Exception:
+            result[key] = None
+    return result
+
+
 # ---- plugins ---------------------------------------------------------------
 
 def _resolve_plugin_loc(p):
@@ -1348,10 +1414,90 @@ def h_meta_sandbox_probe(_):
     return result
 
 
+def h_browser_probe_nav(_):
+    """Map the FL Studio browser structure using the three navigation functions
+    we have never tested: navigateBrowserTabs, navigateBrowserMenu, toggleBrowserNode.
+
+    Records the caption + fileType after each call so we can understand:
+    - How many tabs exist and what they contain
+    - Whether navigateBrowserMenu jumps by section or by item
+    - Whether toggleBrowserNode opens a folder node
+
+    Returns a dict with all observations. Does NOT restore browser position
+    (we want to leave it on the Mixer presets section if we find it).
+    """
+    import time as _time
+
+    result = {
+        "initial": {},
+        "tabs": [],
+        "menu_steps": [],
+        "toggle_test": None,
+        "final": {},
+    }
+
+    def _snap():
+        try:
+            cap = ui.getFocusedNodeCaption()
+        except Exception as e:
+            cap = "ERR:" + str(e)
+        try:
+            ftype = ui.getFocusedNodeFileType()
+        except Exception as e:
+            ftype = "ERR:" + str(e)
+        return {"caption": cap, "fileType": ftype}
+
+    # --- 0. Record initial state ---
+    result["initial"] = _snap()
+
+    # --- 1. Probe navigateBrowserTabs: step through tabs forward (max 16) ---
+    for i in range(16):
+        try:
+            ui.navigateBrowserTabs(1, 1)
+            s = _snap()
+            s["tab_step"] = i + 1
+            result["tabs"].append(s)
+            # Stop if we see "Mixer" in the caption (found our target)
+            if "mixer" in s["caption"].lower() or "preset" in s["caption"].lower():
+                s["TARGET_FOUND"] = True
+        except Exception as e:
+            result["tabs"].append({"tab_step": i + 1, "error": str(e)})
+            break
+
+    # --- 2. From current position, probe navigateBrowserMenu (up to 20 steps down) ---
+    for i in range(20):
+        try:
+            ui.navigateBrowserMenu(1, 1)
+            s = _snap()
+            s["menu_step"] = i + 1
+            result["menu_steps"].append(s)
+            if "mixer" in s["caption"].lower() or "preset" in s["caption"].lower():
+                s["TARGET_FOUND"] = True
+                # Try toggleBrowserNode to expand this section
+                try:
+                    ui.toggleBrowserNode()
+                    after = _snap()
+                    result["toggle_test"] = {
+                        "before": s["caption"],
+                        "after_toggle": after,
+                    }
+                except Exception as te:
+                    result["toggle_test"] = {"error": str(te)}
+                break
+        except Exception as e:
+            result["menu_steps"].append({"menu_step": i + 1, "error": str(e)})
+            break
+
+    # --- 3. Final state ---
+    result["final"] = _snap()
+    return result
+
+
 def h_plugins_probe_api(_):
-    """Return all callable attributes of plugins, mixer and ui modules."""
+    """Return all callable attributes of ALL FL Studio API modules."""
     result = {}
-    for mod in (plugins, mixer, ui):
+    for mod in (plugins, mixer, ui, channels, transport, patterns,
+                playlist, general, arrangement, device):
         attrs = {}
         for name in dir(mod):
             if name.startswith("_"):
@@ -2252,6 +2398,16 @@ def h_ui_scroll_to_channel(p):
     return {"ok": True}
 
 
+def h_ui_show_notification(p):
+    """Display a notification bubble in FL Studio's UI."""
+    msg = str(p.get("message", ""))
+    try:
+        ui.showNotification(msg)
+        return {"ok": True, "message": msg}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 # ---- piano roll (staging only — real edit happens in pyscript via keystroke) ----
 
 def _stage_piano_roll_request(request):
@@ -2478,6 +2634,9 @@ _HANDLERS = {
     "mixer.getEQ": h_mixer_get_eq,
     "mixer.setEQBand": h_mixer_set_eq_band,
     "mixer.linkChannelToTrack": h_mixer_link_channel,
+    "mixer.pluginMixLevel": h_mixer_plugin_mix_level,
+    "mixer.trackSlotsEnabled": h_mixer_track_slots_enabled,
+    "mixer.stereoAdvanced": h_mixer_stereo_advanced,
     # plugins
     "plugins.isValid": h_plugins_is_valid,
     "plugins.name": h_plugins_name,
@@ -2498,6 +2657,7 @@ _HANDLERS = {
     "meta.sandboxProbe": h_meta_sandbox_probe,
     "meta.probeWindows": h_meta_sandbox_probe,  # legacy alias (no-restart diag)
     "plugins.probeApi": h_plugins_probe_api,
+    "browser.probeNav": h_browser_probe_nav,
     "plugins.probeBrowserNav": h_plugins_probe_browser_nav,
     "plugins.loadViaUI": h_plugins_load_via_ui,
     "mixer.loadFST": h_mixer_load_fst,
@@ -2558,6 +2718,7 @@ _HANDLERS = {
     "ui.openPianoRoll": h_ui_open_piano_roll,
     "ui.selectedChannel": h_ui_selected_channel,
     "ui.scrollToChannel": h_ui_scroll_to_channel,
+    "ui.showNotification": h_ui_show_notification,
     # piano roll (stage)
     "pianoroll.addNotes": h_pianoroll_add_notes,
     "pianoroll.addChord": h_pianoroll_add_chord,
