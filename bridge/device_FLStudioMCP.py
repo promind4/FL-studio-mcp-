@@ -8,28 +8,27 @@ fLMCP Bridge — the FL Studio side of the fl-studio-mcp Model Context Protocol 
 
 How it works
 ------------
-This script runs inside FL Studio as a "MIDI device" (no real hardware needed — it's
-loaded by configuring a virtual/loopback MIDI port or by any MIDI input that FL can
-see). On OnInit() it opens a non-blocking TCP server on 127.0.0.1:9876 that
-receives length-prefixed JSON-RPC requests from the fl-studio-mcp server.
+This script runs inside FL Studio as a "MIDI controller" script (no real hardware —
+it uses a virtual loopMIDI port named "fLMCP"). Requests arrive as MIDI SysEx frames
+from the MCP server and responses are sent back the same way.
 
-Everything runs on FL Studio's main thread: FL 2025's Python subinterpreter
-forbids creating threads (start_new_thread returns NULL), so OnIdle() — called
-several times per second — polls the sockets (accept/recv non-blocking),
-parses complete frames, executes the FL API calls, and sends responses back.
+All execution is on FL Studio's main thread. OnIdle() drains the inbox queue,
+dispatches action handlers, and sends JSON responses back via SysEx.
 
-Piano-roll edits are deferred: we stage them into `piano_roll_requests.json` inside
-this script's directory, and the fl-studio-mcp server is responsible for opening the
-piano-roll window and triggering the companion `ComposeWithLLM.pyscript` via
-Ctrl+Alt+Y. After the pyscript runs, it writes `piano_roll_state.json` which the
-MCP server reads back.
+Transport: MIDI SysEx only
+--------------------------
+FL Studio 2025's Python subinterpreter hard-blocks sockets, file I/O, threads, and
+ctypes on Windows. MIDI SysEx is the only viable IPC channel. This was proven
+definitively on 2026-06-14 — see LECONS-APPRISES.md for the full verdict.
 
 Protocol
 --------
-Frame: [4-byte big-endian uint32 length][payload = utf-8 JSON]
-Request:      {"id": int, "action": str, "params": {...}}
-Response:     {"id": int, "ok": bool, "result": ..., "error": str|None}
-Notification: {"event": str, "data": ...}   (server push, no id)
+SysEx frame: F0 7D 46 4C <flags> <seq_lo> <seq_hi> <base64_chunk> F7
+  - 0x7D = non-commercial manufacturer ID; 46 4C = "FL"
+  - JSON is base64-encoded and split into 512-char chunks
+  - flags bit0 = final chunk marker
+Request:  {"id": int, "action": str, "params": {...}}
+Response: {"id": int, "ok": bool, "result": ..., "error": str|None}
 """
 
 import base64
@@ -37,7 +36,6 @@ import json
 import os
 import queue
 import socket
-import struct
 import sys
 import time
 import traceback
@@ -61,10 +59,6 @@ import ui
 # Configuration
 # ----------------------------------------------------------------------------
 
-BRIDGE_HOST = "127.0.0.1"
-BRIDGE_PORT = 9876
-HEADER = struct.Struct(">I")
-MAX_FRAME = 16 * 1024 * 1024
 BRIDGE_VERSION = "0.1.0"
 
 
@@ -80,25 +74,18 @@ def _script_dir():
 
 
 SCRIPT_DIR = _script_dir()
-PIANO_ROLL_DIR_NAME = "Piano roll scripts"
-PR_REQUEST = Path(SCRIPT_DIR).parent.parent / PIANO_ROLL_DIR_NAME / "fLMCP_request.json"
-PR_STATE = Path(SCRIPT_DIR).parent.parent / PIANO_ROLL_DIR_NAME / "fLMCP_state.json"
 
 
 # ----------------------------------------------------------------------------
 # Global state
 # ----------------------------------------------------------------------------
 
-# Inbox entries are (origin, request): origin is a client socket for the TCP
-# transport, or None for requests that arrived over MIDI SysEx.
+# Inbox entries are (origin, request): origin is None for MIDI SysEx requests.
 _inbox: "queue.Queue[tuple[object, dict]]" = queue.Queue()
-_accept_socket = None
-_clients = {}  # socket -> bytearray receive buffer (incremental frame parsing)
 _shutting_down = False
 _started_at = time.monotonic()
 _idle_tick = 0
 _last_refresh_push = 0.0
-_known_clients = set()  # live client sockets for push notifications
 _midi_active = False  # True once a SysEx request arrived (enables MIDI pushes)
 _sysex_rx = []  # base64 ASCII chunks of the message currently being received
 
@@ -112,13 +99,6 @@ def _log(msg):
         print("[fLMCP] " + msg)
     except Exception:
         pass
-
-
-def _pack_frame(obj):
-    body = json.dumps(obj, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-    if len(body) > MAX_FRAME:
-        raise ValueError("frame too large: %d" % len(body))
-    return HEADER.pack(len(body)) + body
 
 
 def _color_to_int(color):
@@ -163,9 +143,7 @@ def _safe(fn, *a, **kw):
 
 
 # ----------------------------------------------------------------------------
-# Network pump — threadless, runs entirely on FL's main thread from OnIdle.
-# FL Studio 2025's Python subinterpreter forbids creating threads
-# (start_new_thread returns NULL), so all I/O is non-blocking and polled.
+# Bridge utilities
 # ----------------------------------------------------------------------------
 
 def _probe_sandbox():
@@ -219,112 +197,6 @@ def _probe_sandbox():
         _log("probe ctypes CreateFileW pipe: reached OS (err=%d, 2=not found=GOOD)" % err)
     except BaseException as e:
         _log("probe ctypes CreateFileW pipe: BLOCKED (%s)" % e)
-
-
-_bind_attempts = 0
-
-
-def _start_listening():
-    global _accept_socket, _bind_attempts
-    if _accept_socket is not None:
-        return True
-    _bind_attempts += 1
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        s.bind((BRIDGE_HOST, BRIDGE_PORT))
-        s.listen(4)
-        s.setblocking(False)
-        _accept_socket = s
-        _log("TCP server listening on %s:%d" % (BRIDGE_HOST, BRIDGE_PORT))
-        return True
-    except Exception as e:
-        _log("failed to bind bridge port: %s" % e)
-        _accept_socket = None
-        return False
-
-
-def _drop_client(sock):
-    _clients.pop(sock, None)
-    _known_clients.discard(sock)
-    try:
-        sock.close()
-    except Exception:
-        pass
-
-
-def _send_frame(sock, frame_bytes):
-    # Localhost + small frames: a short blocking send keeps the code simple
-    # without risking a partial write on the non-blocking socket.
-    try:
-        sock.settimeout(2.0)
-        sock.sendall(frame_bytes)
-        return True
-    except Exception as e:
-        _log("send failed: %s" % e)
-        _drop_client(sock)
-        return False
-    finally:
-        try:
-            sock.setblocking(False)
-        except Exception:
-            pass
-
-
-def _pump_network():
-    """Accept pending connections and parse incoming frames. Main thread only."""
-    if _accept_socket is None:
-        return
-    while True:
-        try:
-            conn, _addr = _accept_socket.accept()
-        except (BlockingIOError, InterruptedError):
-            break
-        except Exception as e:
-            _log("accept error: %s" % e)
-            break
-        conn.setblocking(False)
-        _clients[conn] = bytearray()
-        _known_clients.add(conn)
-
-    for sock in list(_clients.keys()):
-        buf = _clients.get(sock)
-        if buf is None:
-            continue
-        closed = False
-        while True:
-            try:
-                chunk = sock.recv(65536)
-            except (BlockingIOError, InterruptedError):
-                break
-            except Exception:
-                closed = True
-                break
-            if not chunk:
-                closed = True
-                break
-            buf.extend(chunk)
-        while True:
-            if len(buf) < HEADER.size:
-                break
-            (length,) = HEADER.unpack(bytes(buf[:HEADER.size]))
-            if length > MAX_FRAME:
-                _log("oversized frame (%d bytes); dropping client" % length)
-                closed = True
-                break
-            if len(buf) < HEADER.size + length:
-                break  # frame incomplete — wait for the next idle tick
-            body = bytes(buf[HEADER.size:HEADER.size + length])
-            del buf[:HEADER.size + length]
-            try:
-                req = json.loads(body.decode("utf-8"))
-            except Exception as e:
-                _send_frame(sock, _pack_frame(
-                    {"id": 0, "ok": False, "error": "frame_error: %s" % e}))
-                continue
-            _inbox.put((sock, req))
-        if closed:
-            _drop_client(sock)
 
 
 # ----------------------------------------------------------------------------
@@ -435,8 +307,6 @@ def h_meta_info(_):
         "api_modules": ["transport","mixer","channels","patterns","playlist",
                         "plugins","arrangement","ui","general","device","midi"],
         "script_dir": str(SCRIPT_DIR),
-        "tcp_host": BRIDGE_HOST,
-        "tcp_port": BRIDGE_PORT,
     }
 
 
@@ -1155,7 +1025,7 @@ MAX_BATCH_CHANGES = 128
 
 
 def h_plugins_set_params(p):
-    """Batch parameter writes: one TCP round-trip, N setParamValue calls.
+    """Batch parameter writes: one round-trip, N setParamValue calls.
 
     Applies up to MAX_BATCH_CHANGES (128) changes per call; excess changes are
     dropped and a truncation error entry is appended to the response.
@@ -1296,12 +1166,7 @@ def h_meta_sandbox_probe(_):
     """
     result = {}
 
-    # --- live TCP listener state (set at OnInit by _start_listening) ---
-    result["accept_socket_active"] = _accept_socket is not None
-    result["bind_attempts"] = _bind_attempts
     result["midi_active"] = _midi_active
-    result["bridge_host"] = BRIDGE_HOST
-    result["bridge_port"] = BRIDGE_PORT
 
     # --- can we create a TCP socket? ---
     try:
@@ -1323,17 +1188,6 @@ def h_meta_sandbox_probe(_):
         result["socket_bind_listen"] = "OK (ephemeral %d)" % port
     except BaseException as e:
         result["socket_bind_listen"] = "BLOCKED: %s: %s" % (type(e).__name__, e)
-
-    # --- can we self-connect to the bridge's own listener on 9876? ---
-    if _accept_socket is not None:
-        try:
-            c = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            c.settimeout(1.0)
-            c.connect((BRIDGE_HOST, BRIDGE_PORT))
-            c.close()
-            result["self_connect_9876"] = "OK — listener reachable"
-        except BaseException as e:
-            result["self_connect_9876"] = "FAIL: %s: %s" % (type(e).__name__, e)
 
     # --- thread creation (the original geezoria blocker)? ---
     try:
@@ -2446,153 +2300,6 @@ def h_ui_show_notification(p):
         return {"ok": False, "error": str(e)}
 
 
-# ---- piano roll (staging only — real edit happens in pyscript via keystroke) ----
-
-def _stage_piano_roll_request(request):
-    PR_REQUEST.parent.mkdir(parents=True, exist_ok=True)
-    existing = []
-    if PR_REQUEST.exists():
-        try:
-            data = json.loads(PR_REQUEST.read_text(encoding="utf-8"))
-            if isinstance(data, list):
-                existing = data
-        except Exception:
-            existing = []
-    existing.append(request)
-    PR_REQUEST.write_text(json.dumps(existing, indent=2), encoding="utf-8")
-
-
-def _prepare_piano_roll(channel, pattern):
-    """Make sure the right channel's piano roll is open before keystroke is sent."""
-    if pattern is not None:
-        patterns.jumpToPattern(int(pattern))
-    channels.selectOneChannel(int(channel), True)
-    ui.showWindow(_WIN_IDS["piano_roll"])
-    try:
-        ui.setFocused(_WIN_IDS["piano_roll"])
-    except Exception:
-        pass
-
-
-def _read_piano_roll_state():
-    if not PR_STATE.exists():
-        return None
-    try:
-        return json.loads(PR_STATE.read_text(encoding="utf-8"))
-    except Exception:
-        return None
-
-
-def h_pianoroll_add_notes(p):
-    _prepare_piano_roll(p["channel"], p.get("pattern"))
-    if p.get("clear_first"):
-        _stage_piano_roll_request({"action": "clear"})
-    _stage_piano_roll_request({"action": "add_notes", "notes": p.get("notes", [])})
-    return {"staged": True, "needs_keystroke": True, "request_file": str(PR_REQUEST)}
-
-
-def h_pianoroll_add_chord(p):
-    _prepare_piano_roll(p["channel"], p.get("pattern"))
-    _stage_piano_roll_request({
-        "action": "add_chord",
-        "time": float(p.get("time_bars", 0.0)) * 4,
-        "duration": float(p.get("duration_bars", 1.0)) * 4,
-        "notes": [{"midi": n, "velocity": float(p.get("velocity", 0.8))} for n in p["midi_notes"]],
-    })
-    return {"staged": True, "needs_keystroke": True, "request_file": str(PR_REQUEST)}
-
-
-def h_pianoroll_add_arpeggio(p):
-    """Expand arpeggio to linear notes before staging."""
-    notes_midi = list(p["midi_notes"])
-    direction = p.get("direction", "up")
-    if direction == "down":
-        notes_midi.reverse()
-    elif direction == "updown":
-        notes_midi = notes_midi + notes_midi[-2:0:-1]
-    elif direction == "random":
-        import random
-        random.shuffle(notes_midi)
-
-    step_bars = float(p.get("step_bars", 0.25))
-    dur_bars = float(p.get("note_duration_bars", 0.25))
-    start_bars = float(p.get("time_bars", 0.0))
-    repeats = int(p.get("repeats", 1))
-
-    total_notes = len(notes_midi) * repeats
-    out = []
-    for i in range(total_notes):
-        out.append({
-            "midi": notes_midi[i % len(notes_midi)],
-            "time": (start_bars + i * step_bars) * 4,  # quarter-notes for pyscript
-            "duration": dur_bars * 4,
-            "velocity": float(p.get("velocity", 0.8)),
-        })
-    _prepare_piano_roll(p["channel"], p.get("pattern"))
-    _stage_piano_roll_request({"action": "add_notes", "notes": out})
-    return {"staged": True, "needs_keystroke": True, "notes": len(out)}
-
-
-def h_pianoroll_delete_notes(p):
-    _prepare_piano_roll(p["channel"], p.get("pattern"))
-    # pyscript expects time in quarter notes
-    norm = [{"midi": n["midi"], "time": float(n["time_bars"]) * 4} for n in p.get("notes", [])]
-    _stage_piano_roll_request({"action": "delete_notes", "notes": norm})
-    return {"staged": True, "needs_keystroke": True}
-
-
-def h_pianoroll_clear(p):
-    _prepare_piano_roll(p["channel"], p.get("pattern"))
-    _stage_piano_roll_request({"action": "clear"})
-    return {"staged": True, "needs_keystroke": True}
-
-
-def h_pianoroll_read(p):
-    """The pyscript writes the current state file on every run. We return the last known state."""
-    _prepare_piano_roll(p["channel"], p.get("pattern"))
-    # Staging a no-op action so the pyscript refreshes the state file
-    _stage_piano_roll_request({"action": "export_only"})
-    state = _read_piano_roll_state()
-    return {"staged": True, "needs_keystroke": True, "last_state": state}
-
-
-def h_pianoroll_quantize(p):
-    _prepare_piano_roll(p["channel"], p.get("pattern"))
-    _stage_piano_roll_request({
-        "action": "quantize",
-        "grid": float(p.get("grid_bars", 0.25)) * 4,
-        "strength": float(p.get("strength", 1.0)),
-    })
-    return {"staged": True, "needs_keystroke": True}
-
-
-def h_pianoroll_transpose(p):
-    _prepare_piano_roll(p["channel"], p.get("pattern"))
-    _stage_piano_roll_request({"action": "transpose", "semitones": int(p.get("semitones", 0))})
-    return {"staged": True, "needs_keystroke": True}
-
-
-def h_pianoroll_humanize(p):
-    _prepare_piano_roll(p["channel"], p.get("pattern"))
-    _stage_piano_roll_request({
-        "action": "humanize",
-        "timing_jitter": float(p.get("timing_jitter_bars", 0.02)) * 4,
-        "velocity_jitter": float(p.get("velocity_jitter", 0.1)),
-    })
-    return {"staged": True, "needs_keystroke": True}
-
-
-def h_pianoroll_duplicate(p):
-    _prepare_piano_roll(p["channel"], p.get("pattern"))
-    _stage_piano_roll_request({
-        "action": "duplicate",
-        "source_time": float(p["source_time_bars"]) * 4,
-        "length": float(p["length_bars"]) * 4,
-        "dest_time": float(p["dest_time_bars"]) * 4,
-    })
-    return {"staged": True, "needs_keystroke": True}
-
-
 # ----------------------------------------------------------------------------
 # Handler table
 # ----------------------------------------------------------------------------
@@ -2757,17 +2464,6 @@ _HANDLERS = {
     "ui.selectedChannel": h_ui_selected_channel,
     "ui.scrollToChannel": h_ui_scroll_to_channel,
     "ui.showNotification": h_ui_show_notification,
-    # piano roll (stage)
-    "pianoroll.addNotes": h_pianoroll_add_notes,
-    "pianoroll.addChord": h_pianoroll_add_chord,
-    "pianoroll.addArpeggio": h_pianoroll_add_arpeggio,
-    "pianoroll.deleteNotes": h_pianoroll_delete_notes,
-    "pianoroll.clear": h_pianoroll_clear,
-    "pianoroll.read": h_pianoroll_read,
-    "pianoroll.quantize": h_pianoroll_quantize,
-    "pianoroll.transpose": h_pianoroll_transpose,
-    "pianoroll.humanize": h_pianoroll_humanize,
-    "pianoroll.duplicate": h_pianoroll_duplicate,
 }
 
 
@@ -2781,41 +2477,19 @@ def OnInit():
     _log("FL version: %s" % _safe(general.getVersion))
     _probe_sandbox()
     _shutting_down = False
-    if _start_listening():
-        _log("bridge ready on tcp://%s:%d" % (BRIDGE_HOST, BRIDGE_PORT))
-    else:
-        _log("TCP unavailable (FL 2025 sandbox) — MIDI SysEx transport active. "
-             "Route a loopMIDI port to this controller's input AND set the "
-             "same port number on a loopMIDI output device.")
+    _log("MIDI SysEx transport active. Route loopMIDI 'fLMCP' to this controller's input.")
 
 
 def OnDeInit():
-    global _accept_socket, _shutting_down
+    global _shutting_down
     _log("deinit")
     _shutting_down = True
-    if _accept_socket is not None:
-        try:
-            _accept_socket.close()
-        except Exception:
-            pass
-        _accept_socket = None
-    for c in list(_known_clients):
-        try:
-            c.close()
-        except Exception:
-            pass
-    _known_clients.clear()
-    _clients.clear()
 
 
 def OnIdle():
-    """Pump sockets then drain up to N requests, all on the FL main thread."""
+    """Drain up to N requests from the inbox, all on the FL main thread."""
     global _idle_tick, _last_refresh_push
     _idle_tick += 1
-    if (_accept_socket is None and not _shutting_down
-            and _bind_attempts < 3 and _idle_tick % 100 == 0):
-        _start_listening()  # retry bind if the port was busy at OnInit
-    _pump_network()
     drained = 0
     while drained < 32:
         try:
@@ -2833,22 +2507,15 @@ def OnIdle():
             tb = traceback.format_exc(limit=3)
             resp = {"id": req_id, "ok": False, "error": "%s: %s" % (type(e).__name__, e), "traceback": tb}
             _log("action %s error: %s" % (action, e))
-        if client is None:  # request arrived over MIDI SysEx
-            _midi_send_message(resp)
-        else:
-            _send_frame(client, _pack_frame(resp))
+        _midi_send_message(resp)
 
     # push transport notifications every ~0.5s when playing
     now = time.monotonic()
-    if (_known_clients or _midi_active) and (now - _last_refresh_push) > 0.5:
+    if _midi_active and (now - _last_refresh_push) > 0.5:
         _last_refresh_push = now
         try:
             snap = h_transport_status({})
             event = {"event": "transport.tick", "data": snap}
-            if _known_clients:
-                frame = _pack_frame(event)
-                for c in list(_known_clients):
-                    _send_frame(c, frame)
             if _midi_active:
                 _midi_send_message(event)
         except Exception:
@@ -2883,12 +2550,9 @@ def OnMidiMsg(event):
 
 
 def OnRefresh(flags):
-    # push a refresh event to connected clients (so MCP server can invalidate cache)
+    # push a refresh event to the MCP server (so it can invalidate cache)
     try:
         event = {"event": "refresh", "data": {"flags": int(flags)}}
-        frame = _pack_frame(event)
-        for c in list(_known_clients):
-            _send_frame(c, frame)
         if _midi_active:
             _midi_send_message(event)
     except Exception:
@@ -2898,9 +2562,6 @@ def OnRefresh(flags):
 def OnProjectLoad(status):
     try:
         event = {"event": "projectLoad", "data": {"status": status}}
-        frame = _pack_frame(event)
-        for c in list(_known_clients):
-            _send_frame(c, frame)
         if _midi_active:
             _midi_send_message(event)
     except Exception:

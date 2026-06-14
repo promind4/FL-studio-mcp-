@@ -18,9 +18,10 @@ _client_lock = threading.Lock()
 def _make_client():
     """Pick the bridge transport.
 
-    FLMCP_TRANSPORT=tcp|midi forces one; default "auto" uses TCP when the
-    bridge port answers (FL builds that allow sockets) and falls back to
-    MIDI SysEx via loopMIDI (FL Studio 2025, whose sandbox blocks sockets).
+    FLMCP_TRANSPORT=tcp|midi forces one transport explicitly.
+    Default "auto": tries TCP first (works on macOS FL Studio builds that allow sockets)
+    then falls back to MIDI SysEx (required on Windows FL Studio 2025 where the
+    Python sandbox hard-blocks all socket operations).
     """
     transport = os.environ.get("FLMCP_TRANSPORT", "auto").lower()
     if transport == "midi":
@@ -294,8 +295,8 @@ def build_server() -> FastMCP:
     @mcp.tool()
     def fl_probe_sandbox() -> dict:
         """Probe what FL Studio 2025's Python subinterpreter allows: socket,
-        thread, file I/O, ctypes, plus live TCP-listener state. Returns proof
-        (not inference) of why MIDI SysEx is the only viable transport."""
+        thread, file I/O, ctypes. Returns sandbox capability evidence.
+        Verdict: everything except MIDI SysEx is blocked on Windows FL 2025."""
         return get_client().call("meta.sandboxProbe")
 
     @mcp.tool()
