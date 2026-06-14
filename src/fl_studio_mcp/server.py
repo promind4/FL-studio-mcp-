@@ -363,8 +363,15 @@ def build_server() -> FastMCP:
                                bandwidth: float | None = None) -> dict:
         """Set a band on FL Studio's built-in mixer EQ.
         band: 0=low shelf, 1=mid parametric, 2=high shelf.
-        Call fl_get_native_eq first to see current values and infer scale.
-        For precision multi-band EQ prefer fl_set_plugin_params on Pro-Q 3."""
+
+        All values NORMALIZED 0.0-1.0. Calibrated ranges (tested 2026-06-14):
+          GAIN      : norm = dB/36 + 0.5  |  dB = (norm-0.5)*36  |  range +-18 dB
+                      0.0=-18dB  0.5=0dB  0.75=+9dB  1.0=+18dB
+          FREQUENCY : norm = log10(Hz/10) / log10(1600)  |  Hz = 10 * 1600^norm
+                      0.0=10Hz   0.5=400Hz   1.0=16kHz
+          BANDWIDTH : default=0.267 (wider Q); larger value = narrower Q (unverified)
+
+        For precision multi-band EQ use fl_set_plugin_params on Pro-Q 3 instead."""
         p: dict = {"track": track, "band": band}
         if frequency is not None:
             p["frequency"] = frequency

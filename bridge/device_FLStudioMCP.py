@@ -1464,13 +1464,35 @@ def h_browser_probe_nav(_):
         result["error"] = "Could not open browser panel — aborting to prevent crash"
         return result
 
-    # --- 1. Record initial state ---
+    # Also try setFocused to give keyboard focus (showWindow makes it visible but not focused)
+    result["focus_attempts"] = []
+    for idx in (4, 2, 3, 1):
+        try:
+            ui.setFocused(idx)
+            result["focus_attempts"].append({"setFocused": idx, "ok": True})
+            break
+        except Exception as e:
+            result["focus_attempts"].append({"setFocused": idx, "error": str(e)})
+
+    # --- 1. Seed a selection so getFocusedNodeCaption() returns something ---
+    # navigateBrowser(1,1) = move to next item
+    try:
+        ui.navigateBrowser(1, 1)
+    except Exception:
+        pass
     result["initial"] = _snap()
 
-    # --- 2. Probe navigateBrowserTabs: step through tabs forward (max 12) ---
+    # --- 2. Probe navigateBrowserTabs ---
+    # navigateBrowserTabs takes ONE argument (direction only, no step).
+    # After each tab change we must call navigateBrowser(1,1) to land on
+    # an item — otherwise getFocusedNodeCaption() stays empty.
     for i in range(12):
         try:
-            ui.navigateBrowserTabs(1, 1)
+            ui.navigateBrowserTabs(1)
+            try:
+                ui.navigateBrowser(1, 1)
+            except Exception:
+                pass
             s = _snap()
             s["tab_step"] = i + 1
             result["tabs"].append(s)
@@ -1484,6 +1506,10 @@ def h_browser_probe_nav(_):
     for i in range(20):
         try:
             ui.navigateBrowserMenu(1, 1)
+            try:
+                ui.navigateBrowser(1, 1)
+            except Exception:
+                pass
             s = _snap()
             s["menu_step"] = i + 1
             result["menu_steps"].append(s)

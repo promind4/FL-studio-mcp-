@@ -220,6 +220,19 @@ ne fonctionne — plutôt que de crasher FL Studio.
 
 **Ne jamais appeler navigateBrowserTabs / navigateBrowserMenu sans ouvrir le browser d'abord.**
 
+### Verdict final — getFocusedNodeCaption() est inutilisable depuis un handler bridge
+
+Tests exhaustifs (2026-06-14) : même avec `showWindow(4)` + `setFocused(4)` + `navigateBrowser(1,1)`,
+`getFocusedNodeCaption()` et `getFocusedNodeFileType()` retournent toujours `""` / `-1`.
+
+Ces fonctions ne lisent la sélection que si le browser a été focusé par l'**utilisateur**
+(clic ou interaction clavier). Depuis un handler bridge appelé via MIDI, le focus programmatique
+ne suffit pas.
+
+**Conséquence :** la navigation browser rapide (tabs/menu) pour localiser les FST est
+**impossible de manière autonome**. L'approche mega-template (plugins pré-chargés, bypass)
+est la seule solution viable pour le contrôle sans interaction utilisateur.
+
 ---
 
 ## Formules de calibration Pro-Q 3 (location="mixer")
