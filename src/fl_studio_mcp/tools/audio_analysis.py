@@ -11,8 +11,12 @@ import librosa
 import numpy as np
 
 
-def analyze_audio(filepath: str, sr_target: int = 22050) -> dict:
+def analyze_audio(filepath: str, sr_target: int = 22050,
+                  analyze_seconds: float = 30.0) -> dict:
     """Analyze a WAV/MP3/FLAC file and return mixing-relevant metrics.
+
+    analyze_seconds: only load this many seconds (default 30s — enough for
+    LUFS + spectral analysis, avoids timeout on large files).
 
     Returns a flat dict the LLM can act on directly:
     - Levels : peak_dbfs, rms_dbfs, lufs
@@ -26,7 +30,8 @@ def analyze_audio(filepath: str, sr_target: int = 22050) -> dict:
     if not path.exists():
         return {"error": f"File not found: {filepath}"}
 
-    y, sr = librosa.load(str(path), sr=sr_target, mono=True)
+    y, sr = librosa.load(str(path), sr=sr_target, mono=True,
+                         duration=analyze_seconds)
     duration = librosa.get_duration(y=y, sr=sr)
 
     # --- Levels ---

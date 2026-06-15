@@ -321,7 +321,13 @@ Lit N paramètres en 1 round-trip (~150 ms total au lieu de N×150 ms).
 Handler bridge `plugins.getParams`. Outil MCP `fl_get_plugin_params(track, slot, indices=[...])`.
 
 ### Architecture — Insert 6 = bus reverb parallèle (2026-06-15)
-Pro-R 100% wet + ValhaSupermassive + modulation → compression → EQ → limiter = preset **bus reverb parallèle**, pas mastering. Send activé : t1 → Insert 6 @ 20%.
+Pro-R 100% wet + ValhaSupermassive + modulation → compression → EQ → limiter = preset **bus reverb parallèle**, pas mastering. Send activé : t1 → Insert 6 @ 20%. Sends T3/T4 → Insert 6 également activés le 2026-06-15 (vocal 2 + adlibs → reverb bus).
+
+### Piège #10 — Channel Rack volume plafonné à 0 dB (norm=1.0) (2026-06-15)
+`channels.setChannelVolume(i, norm)` avec `norm > 1.0` est **silencieusement capé à 1.0 = 0 dB**. Aucune erreur retournée — la valeur est juste ramenée à 1.0. Formule : `0 dB = 10^(0/48.28) = 1.0`. La plage effective est donc **−∞ à 0 dB** pour un channel. Le commentaire « range 0–1.5 » dans le code était inexact. Ne jamais cibler > 0 dB pour un channel Rack.
+
+### Piège #11 — fl_analyze_audio / fl_analyze_mix_folder timeout sur gros WAV (2026-06-15)
+Librosa charge le fichier entier par défaut. Sur des WAV de 38 MB (mixage complet à 44100 Hz), le timeout MCP (~30 s) est dépassé. Fix : ajout du paramètre `analyze_seconds=30.0` à `analyze_audio()` — passer `duration=analyze_seconds` à `librosa.load()`. 30 secondes suffisent pour LUFS + analyse spectrale. **Appliquer le fix nécessite un redémarrage du serveur MCP.** En attendant, contourner en lançant directement `python analyze_tmp.py` via PowerShell.
 
 ### PARAM-MAPS.md — cartographie complète et stratégie inter-sessions
 10 plugins cartographiés (Auto-Tune Pro, Pro-R, ValhaSupermassive, Pro-C 2, LALA, Fruity Limiter + plugins précédents). Workflow startup : `fl_get_full_track_info` → comparer noms contre PARAM-MAPS → discover uniquement les inconnus. Gain : -3 à -6 min/session.

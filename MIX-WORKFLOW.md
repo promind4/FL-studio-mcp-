@@ -173,6 +173,7 @@ Le volume Channel Rack est le gain **pré-effets** — avant toute la chaîne FX
 
 - **Pickup mode** : après F5, le premier appel qui RÉDUIT le volume peut être ignoré. Workaround : monter d'abord à 0.85, puis descendre à la cible.
 - **Readback** : `getChannelVolume(i, True)` retourne des dB (True = 1 = flag dB). Le −5.18 est correct.
+- **Plafond 0 dB** : `setChannelVolume` avec norm > 1.0 est silencieusement capé à 1.0 = 0 dB. La plage effective est −∞ à **0 dB**. Ne pas cibler de valeurs positives.
 - **Lister tous les canaux** avec `fl_get_channel_rack_info` avant de commencer — ne pas oublier les doublures.
 
 ---
@@ -358,6 +359,9 @@ fl_get_track_peaks(0)   # vérifier le peak actuel
 | Traiter uniquement l'EQ et ignorer les autres plugins | Chaque plugin de chaque piste doit être évalué |
 | Utiliser computer-use / bouger l'UI | Tout passe par le bridge MCP |
 | Commencer par le master | Stabiliser les pistes d'abord, master en dernier |
+| Cibler > 0 dB en clip gain | FL Studio cap silencieux à 0 dB (norm=1.0) — plafond réel du Channel Rack |
+| Analyser un grand WAV avec fl_analyze_audio sans `analyze_seconds` | Timeout MCP sur fichiers > 20 MB — toujours passer `analyze_seconds=30` |
+| Oublier d'activer les sends vers le bus reverb | Vérifier `fl_get_route_info(vocal, reverb_bus)` pour chaque piste vocale |
 
 ---
 
