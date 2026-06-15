@@ -56,6 +56,7 @@ def build_server() -> FastMCP:
     from .tools import export, mixer, plugin_loader, fst_loader
     from .tools import plugins as plugin_tools
     from .tools import audio_analysis
+    from .tools import fl_export_win
 
     # --- Connectivity ---------------------------------------------------
 
@@ -264,6 +265,78 @@ def build_server() -> FastMCP:
         """Extended track snapshot: volume, pan, mute/solo, all FX slots with
         enabled state, and peak levels — all in one round-trip."""
         return get_client().call("mixer.fullTrackInfo", {"track": track})
+
+    @mcp.tool()
+    def fl_audit_track(track: int) -> dict:
+        """Full plugin audit of a mixer track — one LLM call, all plugins + key params.
+
+        For each valid slot, reads the parameters that matter for mix decisions:
+        EQ bands, compressor thresholds, effect wet/dry, etc.
+        Use this at the start of a mix session instead of calling
+        fl_get_full_track_info + multiple fl_get_plugin_params.
+
+        Returns: track metadata + list of plugins with their key parameters
+        interpreted (value_string) so you can read them without knowing formulas.
+        """
+        client = get_client()
+
+        # Key parameter indices per plugin type (what to read for mix decisions)
+        PLUGIN_PROFILES: dict[str, list[int]] = {
+            "Pro-Q 3": (
+                # Band Used flags (8 bands)
+                [0, 13, 26, 39, 52, 65, 78, 91]
+                # Band 1-6 details: freq+gain+shape
+                + [2, 3, 8, 15, 16, 21, 28, 29, 34, 41, 42, 47, 54, 55, 60, 67, 68, 73]
+            ),
+            "Auto-Tune Pro": list(range(0, 21)),
+            "Smack Attack":  list(range(0, 13)),
+            "TransX":        list(range(0, 11)),
+            "Sibilance":     list(range(0, 7)),
+            "PuigTec EQP1A": list(range(0, 16)),
+            "RCompressor":   list(range(0, 11)),
+            "CLA-76":        list(range(0, 10)),
+            "C1 comp-sc":    list(range(0, 11)),
+            "Valhalla":      list(range(0, 10)),
+        }
+        DEFAULT_INDICES = list(range(0, 12))
+
+        track_info = client.call("mixer.fullTrackInfo", {"track": track})
+        slots = track_info.get("fx_slots", [])
+
+        audited: list[dict] = []
+        for s in slots:
+            if not s.get("valid"):
+                continue
+            plugin_name: str = s.get("name") or ""
+            slot_idx: int = s["slot"]
+            enabled: bool = s.get("enabled", True)
+
+            indices = DEFAULT_INDICES
+            for key, idx_list in PLUGIN_PROFILES.items():
+                if key in plugin_name:
+                    indices = idx_list
+                    break
+
+            params_result = client.call("plugins.getParams", {
+                "index": track, "slot": slot_idx, "location": "mixer",
+                "indices": indices,
+            })
+
+            audited.append({
+                "slot": slot_idx,
+                "plugin": plugin_name,
+                "enabled": enabled,
+                "params": params_result.get("params", []),
+            })
+
+        return {
+            "track": track,
+            "name": track_info.get("name"),
+            "volume_db": track_info.get("volume_db", 0),
+            "peaks": track_info.get("peaks"),
+            "plugin_count": len(audited),
+            "plugins": audited,
+        }
 
     # --- FST Mixer preset loading -------------------------------------------
 
@@ -560,6 +633,66 @@ def build_server() -> FastMCP:
         return audio_analysis.analyze_audio(filepath)
 
     @mcp.tool()
+    def fl_analyze_mix_folder(folder: str = "D:\\TEST MCP\\Audio",
+                              newest_only_minutes: float | None = None) -> dict:
+        """Analyze every track WAV in a folder — pairs with manual Split-export.
+
+        FULLY INTERNAL workflow (no computer-use, no realtime recording):
+          1. User does File > Export > Wave with 'Sép. pistes du mix.'
+             (Split mixer tracks) ticked, saving into `folder`.
+          2. FL writes one WAV per mixer track.
+          3. Call this tool — it analyzes all of them in one shot and tags each
+             with a track_guess (parsed from the filename suffix).
+
+        newest_only_minutes: only analyze files exported in the last N minutes
+        (use ~10 to skip stale files from earlier sessions).
+        """
+        return audio_analysis.analyze_folder(
+            folder, newest_only_minutes=newest_only_minutes)
+
+    @mcp.tool()
+    def fl_set_channel_volume(index: int, volume_db: float) -> dict:
+        """Set the pre-effects clip gain of a Channel Rack channel in dB.
+
+        Equivalent to adjusting the clip gain knob on the waveform — applied
+        BEFORE the mixer FX chain (EQ, compressor, etc.).
+
+        volume_db: gain in dB relative to 0 dBFS.
+          FL Studio default = -5.176 dB (intentional headroom).
+          Range: typically -60 to 0 dB (use 0 for unity gain / max safe level).
+
+        Examples:
+          fl_set_channel_volume(4, -7.18)  # reduce 01_Beat by 2 dB
+          fl_set_channel_volume(7, -1.18)  # boost 04_AdLibs by 4 dB
+        """
+        import math
+        norm = 10 ** (volume_db / 48.28)
+        norm = max(0.0, min(norm, 1.5))
+        return get_client().call("channels.setVolume",
+                                 {"index": index, "volume": norm})
+
+    @mcp.tool()
+    def fl_export_split_tracks(
+        folder: str = "D:\\TEST MCP\\Audio",
+        stem: str = "MIX_ANALYSE",
+        wait_timeout: float = 120.0,
+    ) -> dict:
+        """Export FL Studio tracks as separate WAVs via pywinauto — no computer-use.
+
+        Automates File > Export > Wave with 'Split mixer tracks' enabled.
+        FL Studio must be open and have content to render.
+
+        After this call, use fl_analyze_mix_folder(folder) to read the results.
+
+        Parameters:
+          folder       : destination folder (D:\\TEST MCP\\Audio by default)
+          stem         : base filename — FL appends _<track name>.wav per track
+          wait_timeout : max seconds to wait for the render (default 120s)
+        """
+        return fl_export_win.export_split_tracks(
+            folder=folder, stem=stem, wait_timeout=wait_timeout)
+
+    @mcp.tool()
     def fl_tool_guide() -> dict:
         """Navigation map for all FL Studio MCP tools — call once at session
         start to understand priorities and use cases.
@@ -588,7 +721,10 @@ def build_server() -> FastMCP:
                 "1_session_start": {
                     "priority": 1,
                     "tools": ["fl_ping", "fl_get_project_info", "fl_list_tracks",
-                              "fl_get_full_track_info"],
+                              "fl_get_full_track_info", "fl_audit_track"],
+                    "note": "Use fl_audit_track(track) for a full plugin+params snapshot "
+                            "of one track in a single LLM call. Run on every track before "
+                            "making any changes.",
                 },
                 "2_mixing_core": {
                     "priority": 2,

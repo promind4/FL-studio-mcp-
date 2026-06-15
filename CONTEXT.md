@@ -1,7 +1,11 @@
 # FL Studio MCP — Contexte de reprise
 
 > Fichier de handoff pour LLM ou développeur qui reprend ce projet à froid.
-> Lire ce fichier + `LECONS-APPRISES.md` avant toute intervention.
+> **Ordre de lecture recommandé :**
+> 1. [`MIX-WORKFLOW.md`](MIX-WORKFLOW.md) — **si tu viens mixer** (trame, ordre des opérations, anti-patterns)
+> 2. Ce fichier (`CONTEXT.md`) — architecture, outils disponibles, état du projet
+> 3. [`LECONS-APPRISES.md`](LECONS-APPRISES.md) — bugs critiques Pro-Q 3 / bridge
+> 4. [`PARAM-MAPS.md`](PARAM-MAPS.md) — index de paramètres par plugin
 
 ---
 

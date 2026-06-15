@@ -196,7 +196,7 @@ toutes Bell 0 dB (flat) avant ce run.
 
 ---
 
-## Mastering (Insert 6 — aucune source audio actuellement)
+## Bus effets / Reverb (Insert 6 — confirmé actif 2026-06-15)
 
 ### Pro-R (FabFilter) — Insert 6 s0
 | idx | nom | valeur actuelle | note |

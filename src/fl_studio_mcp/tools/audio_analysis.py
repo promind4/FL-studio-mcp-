@@ -95,6 +95,48 @@ def analyze_audio(filepath: str, sr_target: int = 22050) -> dict:
     }
 
 
+def analyze_folder(folder: str, pattern: str = "*.wav",
+                   newest_only_minutes: float | None = None) -> dict:
+    """Analyze every audio file in a folder (FL 'Split mixer tracks' export).
+
+    The manual workflow this pairs with:
+      1. User: File > Export > Wave, tick 'Sép. pistes du mix.' (Split mixer
+         tracks), save into `folder` (e.g. D:\\TEST MCP\\Audio).
+      2. FL writes one WAV per mixer track, named '<base>_<track name>.wav'.
+      3. Call analyze_folder(folder) — no computer-use, no realtime recording.
+
+    newest_only_minutes: if set, only analyze files modified within the last N
+    minutes (skips stale exports from previous sessions).
+
+    Returns {"folder", "count", "tracks": [ {..analysis.., "track_guess"} ]}.
+    """
+    import time
+
+    root = Path(folder)
+    if not root.exists():
+        return {"error": f"Folder not found: {folder}"}
+
+    files = sorted(root.glob(pattern))
+    if newest_only_minutes is not None:
+        cutoff = time.time() - newest_only_minutes * 60
+        files = [f for f in files if f.stat().st_mtime >= cutoff]
+
+    if not files:
+        return {"folder": folder, "count": 0, "tracks": [],
+                "note": f"No files matching {pattern!r} found."}
+
+    results = []
+    for f in files:
+        res = analyze_audio(str(f))
+        # FL split-export names files '<base>_<track name>.wav' — the track
+        # name is the part after the last underscore.
+        stem = f.stem
+        res["track_guess"] = stem.rsplit("_", 1)[-1] if "_" in stem else stem
+        results.append(res)
+
+    return {"folder": folder, "count": len(results), "tracks": results}
+
+
 def _mix_notes(peak_dbfs, lufs, dynamic_range, bands, centroid_hz) -> list[str]:
     """Generate plain-text observations for the LLM to reason about."""
     notes = []

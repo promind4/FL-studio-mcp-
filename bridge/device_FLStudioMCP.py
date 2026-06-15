@@ -588,8 +588,23 @@ def h_channels_select(p):
 
 
 def h_channels_set_volume(p):
-    channels.setChannelVolume(int(p["index"]), float(p["volume"]), True)
-    return _ch_info(int(p["index"]))
+    import math
+    idx = int(p["index"])
+    # Accept either normalized (0-1) or dB value (if "db" key or value < 0 and abs > 0.1)
+    raw = float(p["volume"])
+    if p.get("volume_db") is not None:
+        db_target = float(p["volume_db"])
+        # Convert dB → normalized: db = 48.28 * log10(norm) → norm = 10^(db/48.28)
+        # Default 0.78125 ↔ -5.176 dB (FL Studio headroom default)
+        norm = 10 ** (db_target / 48.28)
+        norm = max(0.0, min(norm, 1.5))
+    else:
+        norm = max(0.0, min(raw, 1.5))
+    # Use no pickup mode (False/0) so the set is always applied immediately
+    channels.setChannelVolume(idx, norm)
+    info = _ch_info(idx)
+    info["volume_normalized"] = norm
+    return info
 
 
 def h_channels_set_pan(p):
