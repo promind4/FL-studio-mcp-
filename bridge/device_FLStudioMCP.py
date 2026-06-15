@@ -540,17 +540,18 @@ def h_patterns_jump_prev(_):
 
 def _ch_info(i):
     use_global = True
+    color_raw = _safe(channels.getChannelColor, i, use_global)
     return {
         "index": i,
-        "name": channels.getChannelName(i, use_global),
-        "color": _int_to_color_hex(channels.getChannelColor(i, use_global)),
-        "volume": channels.getChannelVolume(i, use_global),
-        "pan": channels.getChannelPan(i, use_global),
+        "name": _safe(channels.getChannelName, i, use_global),
+        "color": _int_to_color_hex(color_raw) if color_raw is not None else None,
+        "volume": _safe(channels.getChannelVolume, i, use_global),
+        "pan": _safe(channels.getChannelPan, i, use_global),
         "pitch": _safe(channels.getChannelPitch, i),
-        "is_muted": channels.isChannelMuted(i, use_global) == 1,
-        "is_solo": channels.isChannelSolo(i, use_global) == 1,
-        "is_selected": channels.isChannelSelected(i, use_global) == 1,
-        "fx_track": channels.getTargetFxTrack(i, use_global),
+        "is_muted": _safe(channels.isChannelMuted, i, use_global) == 1,
+        "is_solo": _safe(channels.isChannelSolo, i, use_global) == 1,
+        "is_selected": _safe(channels.isChannelSelected, i, use_global) == 1,
+        "fx_track": _safe(channels.getTargetFxTrack, i, use_global),
         "type": _safe(channels.getChannelType, i, use_global),
     }
 
@@ -1009,6 +1010,29 @@ def h_plugins_get_param(p):
         "value": plugins.getParamValue(pid, idx, slot, ug),
         "value_string": plugins.getParamValueString(pid, idx, slot, ug),
     }
+
+
+def h_plugins_get_params(p):
+    """Batch parameter reads: one MIDI round-trip, N getParamValue calls.
+
+    indices: [int]. Returns [{index, value, value_string}] in the same order.
+    Mirrors plugins.setParams so reading many params (e.g. all Pro-Q 3 bands)
+    costs one ~150ms round-trip instead of one per index. Per-index failures
+    are reported inline with an "error" key rather than aborting the batch.
+    """
+    idx, slot, ug = _resolve_plugin_loc(p)
+    out = []
+    for raw in p.get("indices", []):
+        try:
+            pid = int(raw)
+            out.append({
+                "index": pid,
+                "value": plugins.getParamValue(pid, idx, slot, ug),
+                "value_string": plugins.getParamValueString(pid, idx, slot, ug),
+            })
+        except Exception as exc:
+            out.append({"index": raw, "error": str(exc)})
+    return {"params": out}
 
 
 def h_plugins_set_param(p):
@@ -1856,11 +1880,20 @@ def h_mixer_full_track_info(p):
             valid = bool(plugins.isValid(track, s, False) == 1)
             name_s = plugins.getPluginName(track, s, 0, False) if valid else None
             enabled = None
-            if valid and hasattr(plugins, "isEnabled"):
-                try:
-                    enabled = bool(plugins.isEnabled(track, s, False))
-                except Exception:
-                    enabled = True
+            if valid:
+                if hasattr(plugins, "isEnabled"):
+                    try:
+                        enabled = bool(plugins.isEnabled(track, s, False))
+                    except Exception:
+                        pass
+                if enabled is None:
+                    # FL 2025 doesn't expose isEnabled — probe via param index -1
+                    # (same index used by setSlotEnabled Strategy 2)
+                    try:
+                        v = plugins.getParamValue(-1, track, s, False)
+                        enabled = (v != 0.0)
+                    except Exception:
+                        enabled = True  # assume enabled if no API available
             slots.append({"slot": s, "valid": valid, "name": name_s, "enabled": enabled})
         except Exception:
             slots.append({"slot": s, "valid": False, "name": None, "enabled": None})
@@ -2291,10 +2324,21 @@ def h_ui_scroll_to_channel(p):
 
 
 def h_ui_show_notification(p):
-    """Display a notification bubble in FL Studio's UI."""
-    msg = str(p.get("message", ""))
+    """Display a notification bubble in FL Studio's UI.
+
+    Note: ui.showNotification() takes an INTEGER notification id from FL's
+    predefined list, not arbitrary text -> it raises
+    "'str' object cannot be interpreted as an integer" when given a string.
+    For arbitrary text the correct call is ui.setHintMsg(), which writes to
+    the hint panel. We use that and keep showNotification only for int ids.
+    """
+    raw = p.get("message", "")
     try:
-        ui.showNotification(msg)
+        if isinstance(raw, int) or (isinstance(raw, str) and raw.strip().isdigit()):
+            ui.showNotification(int(raw))
+            return {"ok": True, "notification_id": int(raw)}
+        msg = str(raw)
+        ui.setHintMsg(msg)
         return {"ok": True, "message": msg}
     except Exception as e:
         return {"ok": False, "error": str(e)}
@@ -2388,6 +2432,7 @@ _HANDLERS = {
     "plugins.paramCount": h_plugins_param_count,
     "plugins.params": h_plugins_params,
     "plugins.getParam": h_plugins_get_param,
+    "plugins.getParams": h_plugins_get_params,
     "plugins.setParam": h_plugins_set_param,
     "plugins.setParams": h_plugins_set_params,
     "plugins.findParam": h_plugins_find_param,

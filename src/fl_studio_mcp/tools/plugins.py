@@ -116,6 +116,30 @@ def set_params(
     })
 
 
+def get_params(
+    client,
+    track: int,
+    slot: int,
+    indices: list[int],
+    location: str = "channel",
+) -> dict:
+    """Read several plugin parameters in one round-trip.
+
+    Args:
+        indices: [int, ...] param indices to read.
+
+    Returns:
+        {"params": [{"index": int, "value": float, "value_string": str}, ...]}
+        Mirrors set_params; turns N single reads into one ~150ms round-trip.
+    """
+    return client.call("plugins.getParams", {
+        "index": track,
+        "slot": slot,
+        "location": location,
+        "indices": indices,
+    })
+
+
 def get_param(
     client,
     track: int,

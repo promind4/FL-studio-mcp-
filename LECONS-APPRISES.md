@@ -286,6 +286,48 @@ confirmé visuellement à 2 bandes propres :
 
 ---
 
+## Leçons session 2026-06-15 — Mix multi-plugins & cartographie complète
+
+### Piège #5 — Plugins « actifs » qui ne font rien (threshold/Peak Reduction neutres)
+Sur cette session, **3 plugins sur 9** dans la chaîne vocale étaient chargés mais neutralisés :
+- C1 comp-sc (Master + Insert 1) : Threshold idx 8 = **1.0** → aucune compression
+- RCompressor (t2/t3 s6) : Threshold idx 3 = **1.0** → aucune compression
+- Sibilance (t2/t3 s4) : Threshold idx 4 = **1.0** → aucun de-essing
+- LALA (Insert 6 s4) : Peak Reduction idx 2 = **0.0** → aucune compression (logique inverse)
+
+**Règle :** en début de session, lire les thresholds/Peak Reduction de tous les compresseurs et de-essers AVANT d'évaluer leur effet. Un plugin présent ≠ un plugin actif.
+
+### Piège #6 — `fl_show_notification` crashait avec du texte
+`ui.showNotification()` attend un **ID entier** FL. Passer une chaîne → `TypeError`.
+Fix : le bridge bascule sur `ui.setHintMsg(str)` pour le texte libre. Corrigé dans le bridge.
+
+### Piège #7 — `fl_get_full_track_info` retournait `enabled: null`
+FL 2025 n'expose pas `plugins.isEnabled`. Fix bridge (2026-06-15) : tente `getParamValue(-1, ...)` en fallback, puis `True` par défaut. L'état bypass désormais lisible — `enabled: true` confirmé sur 9/9 slots vocaux.
+⚠️ Pas parfaitement fiable : si un slot affiche `enabled: true` malgré un comportement suspect, vérifier visuellement le bouton vert dans FL Studio.
+
+### Piège #8 — Chemin bridge ≠ `script_dir` rapporté par `fl_ping`
+`fl_ping` rapporte `C:\Users\USER\Documents\Image-Line\...` (inexistant). Vrai chemin : `D:\Image-Line\FL Studio\Settings\Hardware\fLMCP Bridge\device_FLStudioMCP.py`. Après déploiement → **F5 dans le Script Editor**. Vérifier le reload : l'uptime `fl_ping` doit baisser (reset à 0 puis remonte).
+
+### Piège #9 — Filtre `MIDI CC #0` inopérant sur Auto-Tune Pro
+Plugins standard : MIDI CC commence à idx ~14-128, filtre `name.startswith('MIDI CC')` marche.
+Auto-Tune Pro : params nommés épars (idx 1, 2, 4, 10…89), MIDI CC à idx **4096** → filtre classique renvoie 4096 « vrais params ».
+**Script universel :**
+```python
+[p for p in params if p['name'].strip() and not p['name'].startswith('MIDI')]
+```
+
+### Optimisation — `fl_get_plugin_params` batch read (ajouté 2026-06-14)
+Lit N paramètres en 1 round-trip (~150 ms total au lieu de N×150 ms).
+Handler bridge `plugins.getParams`. Outil MCP `fl_get_plugin_params(track, slot, indices=[...])`.
+
+### Architecture — Insert 6 = bus reverb parallèle (2026-06-15)
+Pro-R 100% wet + ValhaSupermassive + modulation → compression → EQ → limiter = preset **bus reverb parallèle**, pas mastering. Send activé : t1 → Insert 6 @ 20%.
+
+### PARAM-MAPS.md — cartographie complète et stratégie inter-sessions
+10 plugins cartographiés (Auto-Tune Pro, Pro-R, ValhaSupermassive, Pro-C 2, LALA, Fruity Limiter + plugins précédents). Workflow startup : `fl_get_full_track_info` → comparer noms contre PARAM-MAPS → discover uniquement les inconnus. Gain : -3 à -6 min/session.
+
+---
+
 ## Méthode de débogage qui a marché (pour la prochaine fois)
 
 On a appliqué `superpowers:systematic-debugging` :

@@ -15,7 +15,12 @@ from pathlib import Path
 
 import pytest
 
-from fl_studio_mcp.tools.plugins import discover_params, set_params, get_param
+from fl_studio_mcp.tools.plugins import (
+    discover_params,
+    set_params,
+    get_param,
+    get_params,
+)
 
 
 class FakeClient:
@@ -172,6 +177,32 @@ def test_get_param_returns_value():
     assert params["index"] == 3
     assert params["slot"] == 0
     assert params["param"] == 7
+
+
+# ---------------------------------------------------------------------------
+# Test 4b: get_params batches multiple reads in one call
+# ---------------------------------------------------------------------------
+
+def test_get_params_batches_reads():
+    client = FakeClient({
+        "plugins.getParams": {"params": [
+            {"index": 0, "value": 1.0, "value_string": "Used "},
+            {"index": 13, "value": 0.0, "value_string": "Unused "},
+        ]},
+    })
+
+    result = get_params(client, track=2, slot=1, indices=[0, 13])
+
+    assert result["params"][0]["index"] == 0
+    assert result["params"][1]["value"] == 0.0
+
+    # Exactly one round-trip for both indices
+    assert len(client.calls) == 1
+    action, params = client.calls[0]
+    assert action == "plugins.getParams"
+    assert params["indices"] == [0, 13]
+    assert params["index"] == 2
+    assert params["slot"] == 1
 
 
 # ---------------------------------------------------------------------------

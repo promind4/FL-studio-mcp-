@@ -119,6 +119,18 @@ def build_server() -> FastMCP:
         return plugin_tools.get_param(get_client(), track, slot, index,
                                       location=location)
 
+    @mcp.tool()
+    def fl_get_plugin_params(track: int, slot: int, indices: list[int],
+                              location: str = "mixer") -> dict:
+        """Batch-read several plugin parameters in one round-trip.
+        indices: [int, ...]. Returns {"params": [{index, value, value_string}]}.
+        Use instead of many fl_get_plugin_param calls (e.g. reading all Pro-Q 3
+        bands): one ~150ms round-trip instead of one per index.
+        location: "mixer" (default) for FX chain plugins, "channel" for
+        channel-rack instruments."""
+        return plugin_tools.get_params(get_client(), track, slot, indices,
+                                       location=location)
+
     # --- Mixer ------------------------------------------------------------
 
     @mcp.tool()
