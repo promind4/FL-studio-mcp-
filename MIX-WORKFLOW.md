@@ -174,7 +174,7 @@ Métriques clés par piste :
 **Outil :** `fl_set_channel_volume(index, volume_db)`
 
 Le volume Channel Rack est le gain **pré-effets** — avant toute la chaîne FX mixer.  
-**C'est ici qu'on corrige les niveaux bruts.** Ne jamais utiliser le fader mixer pour ça.
+**C'est ici qu'on corrige les niveaux bruts.** Ne jamais utiliser le fader mixer pour ça sauf pour la correction globale du master (anti-clipping en l'absence de limiter).
 
 ### Échelle de valeurs
 
@@ -357,9 +357,18 @@ Pour une vraie reverb, utiliser un autre plugin (Valhalla Room, Reeverb...).
 fl_get_track_peaks(0)   # vérifier le peak actuel
 ```
 
-- Peak > 0 dBFS → limiter ou réduire le gain master
+- Peak > 0 dBFS → limiter ou réduire le fader master
 - Cible loudness streaming : −14 LUFS intégrée
 - Cible loudness radio / club : −9 à −10 LUFS
+
+### Formule fader Mixer Track
+```
+volume = 0.8 × 10^(dB / 45.08)   # 0.8 = référence 0 dB FL Studio
+dB     = 45.08 × log10(volume / 0.8)
+```
+Exemples : −4 dB → 0.653 · −6 dB → 0.600 · −9 dB → 0.505
+
+⚠️ Le fader master ne remplace pas un limiter. Sans limiter sur T0, réduire de ~4 à 5 dB laisse une marge propre avant export. Le Fruity Limiter doit être ajouté via UI.
 
 ---
 

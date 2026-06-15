@@ -323,6 +323,15 @@ Handler bridge `plugins.getParams`. Outil MCP `fl_get_plugin_params(track, slot,
 ### Architecture — Insert 6 = bus reverb parallèle (2026-06-15)
 Pro-R 100% wet + ValhaSupermassive + modulation → compression → EQ → limiter = preset **bus reverb parallèle**, pas mastering. Send activé : t1 → Insert 6 @ 20%. Sends T3/T4 → Insert 6 également activés le 2026-06-15 (vocal 2 + adlibs → reverb bus).
 
+### Formule — Mixer Track volume (découverte 2026-06-15)
+`fl_set_track_volume(track, volume)` où `volume=0.8` = 0 dB (référence mixer FL Studio).
+La formule interne utilise un facteur **~45.08** (pas 48.28 comme le Channel Rack) :
+```
+dB  = 45.08 × log10(volume / 0.8)
+volume = 0.8 × 10^(dB / 45.08)
+```
+Exemples : 0.8=0dB · 0.652=−4.35dB · 0.505=−9.01dB · 1.0=+4.24dB
+
 ### Piège #10 — Channel Rack volume plafonné à 0 dB (norm=1.0) (2026-06-15)
 `channels.setChannelVolume(i, norm)` avec `norm > 1.0` est **silencieusement capé à 1.0 = 0 dB**. Aucune erreur retournée — la valeur est juste ramenée à 1.0. Formule : `0 dB = 10^(0/48.28) = 1.0`. La plage effective est donc **−∞ à 0 dB** pour un channel. Le commentaire « range 0–1.5 » dans le code était inexact. Ne jamais cibler > 0 dB pour un channel Rack.
 
