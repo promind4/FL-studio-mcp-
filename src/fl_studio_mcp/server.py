@@ -55,6 +55,7 @@ def build_server() -> FastMCP:
 
     from .tools import export, mixer, plugin_loader, fst_loader
     from .tools import plugins as plugin_tools
+    from .tools import audio_analysis
 
     # --- Connectivity ---------------------------------------------------
 
@@ -532,6 +533,32 @@ def build_server() -> FastMCP:
 
     # --- Tool guide (LLM navigation map) ------------------------------------
 
+    # --- Audio analysis (Librosa / pyloudnorm — runs in MCP process) --------
+
+    @mcp.tool()
+    def fl_analyze_audio(filepath: str) -> dict:
+        """Analyze a recorded WAV/MP3/FLAC file with Librosa and return mixing metrics.
+
+        WORKFLOW:
+          1. Call fl_set_record_arm(track=N, armed=True) — note the returned path.
+          2. In FL Studio: press Record then Play (Ctrl+R then Space).
+          3. Let it play through, then press Stop.
+          4. Call fl_analyze_audio(filepath=<path from step 1>).
+
+        RETURNS:
+          - peak_dbfs, rms_dbfs, lufs       : levels
+          - dynamic_range_db                 : P95–P10 of frame RMS
+          - frequency_bands_db               : sub/low/low-mid/mid/high-mid/air in dB
+          - spectral_centroid_hz             : tonal brightness
+          - spectral_rolloff_hz, bandwidth_hz: spectral shape
+          - onset_rate_per_sec               : transient density
+          - mix_notes                        : plain-text LLM-readable observations
+
+        EXAMPLE:
+          fl_analyze_audio("D:\\\\TEST MCP\\\\Audio\\\\TEST MCP_2026-06-15 02-49-11_EFFET VOIX.wav")
+        """
+        return audio_analysis.analyze_audio(filepath)
+
     @mcp.tool()
     def fl_tool_guide() -> dict:
         """Navigation map for all FL Studio MCP tools — call once at session
@@ -593,6 +620,15 @@ def build_server() -> FastMCP:
                     "priority": 7,
                     "tools": ["fl_discover_plugin_params", "fl_list_available_plugins",
                               "fl_get_track_peaks", "fl_get_plugin_param"],
+                },
+                "8_audio_analysis": {
+                    "priority": 2,
+                    "tools": ["fl_analyze_audio", "fl_set_record_arm",
+                              "fl_resolve_track_audio"],
+                    "workflow": (
+                        "arm → user presses Record+Play in FL Studio → stop → "
+                        "fl_analyze_audio(path) → read mix_notes"
+                    ),
                 },
                 "8_preset_loading": {
                     "priority": 8,
