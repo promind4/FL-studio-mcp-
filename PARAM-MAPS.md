@@ -28,10 +28,10 @@ plugin) pour tous les plugins déjà rencontrés. **Réutiliser directement ces 
 | 2 | Comp Attack | |
 | 3 | Comp Release | |
 | 4 | Comp PDR Tc | |
-| 5 | Comp Ratio | 0.218 ≈ ratio doux |
-| 6 | Comp Makeup | 0.5 = unité |
+| 5 | Comp Ratio | 0.42 = 2.77:1 (valeur utilisée sur Master/T1) |
+| 6 | Comp Makeup | 0.54 = 3.2 dB (valeur utilisée sur Master/T1) |
 | 7 | Output Gain | |
-| 8 | **Threshold** | **1.0 = AUCUNE compression** ; baisser pour engager. 0.72 ≈ -28 dB |
+| 8 | **Threshold** | **1.0 = AUCUNE compression** ; **0.72 = -28.0 dB** (Master) · **0.68 = -32.0 dB** (T1 INSTRUMENTAL) |
 | 9 | Filter Type | |
 | 10 | Filter Freq | |
 | 11 | Filter Q | |
@@ -43,9 +43,9 @@ plugin) pour tous les plugins déjà rencontrés. **Réutiliser directement ces 
 |----:|-----|------|
 | 0 | Bypass | |
 | 2 | Gain | |
-| 3 | **Threshold** | **1.0 = AUCUNE compression** ; 0.68 ≈ -19 dB |
+| 3 | **Threshold** | **1.0 = AUCUNE compression** ; **0.68 = -19.2 dB** (valeur vocale correcte) |
 | 4 | Attack | |
-| 5 | Ratio | 0.514 |
+| 5 | **Ratio** | **0.625 = 1:1 (aucune compression)** — piège ! **0.45 = 2.99:1 ≈ 3:1** (valeur vocale) |
 | 6 | ARC / Manual | 0=ARC |
 | 7 | Warm / Smooth | |
 | 8 | Release | |

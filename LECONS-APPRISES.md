@@ -289,13 +289,15 @@ confirmé visuellement à 2 bandes propres :
 ## Leçons session 2026-06-15 — Mix multi-plugins & cartographie complète
 
 ### Piège #5 — Plugins « actifs » qui ne font rien (threshold/Peak Reduction neutres)
-Sur cette session, **3 plugins sur 9** dans la chaîne vocale étaient chargés mais neutralisés :
-- C1 comp-sc (Master + Insert 1) : Threshold idx 8 = **1.0** → aucune compression
-- RCompressor (t2/t3 s6) : Threshold idx 3 = **1.0** → aucune compression
-- Sibilance (t2/t3 s4) : Threshold idx 4 = **1.0** → aucun de-essing
+Sur cette session, **plusieurs plugins** dans la chaîne étaient chargés mais neutralisés :
+- C1 comp-sc (Master s1) : Threshold idx 8 = **1.0** → aucune compression. Fix : 0.72 = -28 dB
+- RCompressor (t2/t3/t4 s6) : Threshold idx 3 = **1.0** → aucune compression. Fix : 0.68 = -19.2 dB
+- RCompressor (t2/t3/t4 s6) : Ratio idx 5 = **0.625 = 1:1** → aucune compression même threshold ok. Fix : 0.45 = 3:1
+- Sibilance (t2/t3/t4 s4) : Threshold idx 4 = **1.0** + Range idx 5 = **1.0** → aucun de-essing. Fix : 0.62 + 0.5
 - LALA (Insert 6 s4) : Peak Reduction idx 2 = **0.0** → aucune compression (logique inverse)
 
-**Règle :** en début de session, lire les thresholds/Peak Reduction de tous les compresseurs et de-essers AVANT d'évaluer leur effet. Un plugin présent ≠ un plugin actif.
+**Règle :** en début de session, lire les thresholds ET les ratios de tous les compresseurs
+AVANT d'évaluer leur effet. Un plugin présent ≠ actif. Threshold seul ne suffit pas : ratio=1:1 = compression nulle.
 
 ### Piège #6 — `fl_show_notification` crashait avec du texte
 `ui.showNotification()` attend un **ID entier** FL. Passer une chaîne → `TypeError`.
