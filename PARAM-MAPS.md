@@ -76,8 +76,8 @@ plugin) pour tous les plugins déjà rencontrés. **Réutiliser directement ces 
 | 0 | Bypass | |
 | 2 | Lookahead | |
 | 3 | Detection | |
-| 4 | **Threshold** | **1.0 = AUCUN de-essing** ; 0.62 ≈ -14 dB |
-| 5 | Range | quantité de réduction |
+| 4 | **Threshold** | **1.0 = AUCUN de-essing** ; 0.62 ≈ -14 dB. Valeur correcte : 0.62 |
+| 5 | **Range** | **1.0 = 0 dB = AUCUNE réduction** ⚠️ aussi neutralisé par défaut. Valeur départ : 0.5 |
 | 6 | Mode | |
 | 7 | Monitor | 1 = écoute la bande de sibilance |
 
@@ -176,10 +176,13 @@ toutes Bell 0 dB (flat) avant ce run.
 ### Auto-Tune Pro — chaîne vocale s0
 ⚠️ **Filtre non-standard** : les vraies commandes ne sont pas contiguës ; les params anonymes (idx sans nom) sont de l'état interne. Filtrer par `nom non-vide AND idx < 4096`.
 
+> **Valeurs au 2026-06-15 (T2/T3/T4 identiques)** — la session précédente montrait E/MINOR sur T3/T4,
+> mais tous les audits 2026-06-15 retournent A/HARMONIC sur les 3 tracks.
+
 | idx | nom | valeur actuelle | note |
 |----:|-----|-----------------|------|
-| 1 | Scale | 0.0357 = MINOR | clé musicale — **ne pas changer sans connaître la chanson** |
-| 2 | Key | 0.3636 = E | tonalité — **idem** |
+| 1 | Scale | **1.0 = HARMONIC** | clé musicale — **ne pas changer sans connaître la chanson** |
+| 2 | Key | **0.835 = A** | tonalité — **idem** |
 | 3 | Detune | 0.5 = 440 Hz | référence A |
 | 4 | Retune Speed | 0.78 = 11 ms | rapide/audible ; ↑ = plus naturel, ↓ = effet T-Pain |
 | 5 | Vibrato Shape | 0 = NO VIBRATO | |

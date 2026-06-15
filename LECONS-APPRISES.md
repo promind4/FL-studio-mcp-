@@ -323,14 +323,39 @@ Handler bridge `plugins.getParams`. Outil MCP `fl_get_plugin_params(track, slot,
 ### Architecture — Insert 6 = bus reverb parallèle (2026-06-15)
 Pro-R 100% wet + ValhaSupermassive + modulation → compression → EQ → limiter = preset **bus reverb parallèle**, pas mastering. Send activé : t1 → Insert 6 @ 20%. Sends T3/T4 → Insert 6 également activés le 2026-06-15 (vocal 2 + adlibs → reverb bus).
 
-### Formule — Mixer Track volume (découverte 2026-06-15)
+### Formule — Mixer Track volume (découverte 2026-06-15, corrigée 2026-06-15)
 `fl_set_track_volume(track, volume)` où `volume=0.8` = 0 dB (référence mixer FL Studio).
-La formule interne utilise un facteur **~45.08** (pas 48.28 comme le Channel Rack) :
+La formule 45.08 est une **approximation** valable uniquement près de 0 dB :
 ```
-dB  = 45.08 × log10(volume / 0.8)
-volume = 0.8 × 10^(dB / 45.08)
+dB  ≈ 45.08 × log10(volume / 0.8)   ← approximation, sous-estime les vraies valeurs
+volume ≈ 0.8 × 10^(dB / 45.08)
 ```
-Exemples : 0.8=0dB · 0.652=−4.35dB · 0.505=−9.01dB · 1.0=+4.24dB
+Points vérifiés empiriquement (readback API = source de vérité) :
+- volume=0.652 → -4.352 dB (formule donne −4.0 dB — écart ~0.35 dB, OK)
+- volume=0.982 → +5.096 dB (formule donne +4.0 dB — écart ~1.1 dB, significatif)
+- Le facteur réel varie : ~49 près de -4 dB, ~57 près de +5 dB (courbe non-linéaire FL)
+
+**Règle pratique :** pour les réductions (fader en dessous de 0 dB), l'approximation 45.08 est
+acceptable (erreur < 0.4 dB). Pour les boosts, **lire le `volume_db` retourné par l'API** plutôt
+que de se fier au calcul. Ne jamais cibler > volume=1.0 (vaut ~+5 dB selon le readback).
+
+### Piège #12 — Sibilance Range = 1.0 = 0 dB de réduction = de-esser silencieux (2026-06-15)
+Sur le Waves Sibilance (slot 4), deux paramètres doivent être réglés pour qu'il fonctionne :
+- idx 4 (Threshold) : 1.0 = 0 dB = aucun déclenchement. Valeur correcte : 0.62 ≈ -14 dB.
+- idx 5 (Range) : 1.0 = 0.0 dB de réduction = aucune atténuation même quand déclenché.
+  Valeur de départ correcte : **0.5** (quantité de réduction à calibrer à l'oreille).
+
+Un de-esser avec Threshold correct mais Range=1.0 ne fait RIEN. Vérifier les deux.
+Valeur de départ utilisée en session : Threshold=0.62, Range=0.5 sur T2/T3/T4.
+
+### Piège #13 — Changements FL Studio perdus entre sessions si pas de Ctrl+S (2026-06-15)
+Les réglages appliqués via MCP (faders, params plugins) ne sont **pas sauvegardés automatiquement**.
+Si FL Studio est fermé ou rechargé sans Ctrl+S, tout est perdu. Constats :
+- Master fader mis à -4.35 dB en session n→ retrouvé à 0 dB en session n+1.
+- RCompressor/Sibilance corrigés → réinitialisés à 1.0 à la session suivante.
+
+**Règle :** toujours demander à l'utilisateur de faire **Ctrl+S dans FL Studio** après avoir appliqué
+des changements importants. OU auditer les thresholds/faders en tout début de session (piège #5).
 
 ### Piège #10 — Channel Rack volume plafonné à 0 dB (norm=1.0) (2026-06-15)
 `channels.setChannelVolume(i, norm)` avec `norm > 1.0` est **silencieusement capé à 1.0 = 0 dB**. Aucune erreur retournée — la valeur est juste ramenée à 1.0. Formule : `0 dB = 10^(0/48.28) = 1.0`. La plage effective est donc **−∞ à 0 dB** pour un channel. Le commentaire « range 0–1.5 » dans le code était inexact. Ne jamais cibler > 0 dB pour un channel Rack.
