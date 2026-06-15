@@ -1,5 +1,48 @@
 # Cartes de contrôle des plugins — index normalisés (FL 2025)
 
+---
+
+## ⚠️ AVERTISSEMENT FONDAMENTAL — À LIRE AVANT TOUTE UTILISATION
+
+Ce fichier est une **base de connaissance documentaire**, pas un ensemble de presets ni de réglages à appliquer automatiquement.
+
+**Les valeurs présentes dans ce fichier proviennent de sessions spécifiques, à un instant donné, sur un contenu audio précis.** Elles décrivent ce qui a été observé ou appliqué dans ces contextes. Elles ne constituent pas des recommandations universelles.
+
+### Règle fondamentale
+
+> **Aucune valeur de ce fichier ne doit être copiée ou appliquée à une autre session, piste ou projet sans analyse préalable.**
+
+Chaque décision de mixage doit être prise en fonction de :
+- Le contenu audio réellement présent sur la piste
+- Le rôle de l'instrument ou de la voix dans le mix
+- Les autres traitements déjà appliqués
+- L'objectif sonore recherché
+- L'équilibre global du projet
+
+### Ce que ce fichier permet
+
+- Identifier les index de contrôle d'un plugin (éviter `fl_discover_plugin_params`)
+- Comprendre la signification des paramètres disponibles
+- Connaître les **pièges** de chaque plugin (threshold=1.0 neutre, Range=1.0 nul, etc.)
+- Retrouver l'historique de ce qui a été appliqué dans les sessions précédentes
+
+### Ce que ce fichier interdit
+
+- ❌ Reprendre un threshold d'une session et l'appliquer à une autre sans raison
+- ❌ Utiliser un ratio de compression comme valeur de référence universelle
+- ❌ Copier un gain EQ, une fréquence, une attaque ou un release sans analyser la situation
+- ❌ Interpréter "valeur actuelle = X" comme "la bonne valeur = X"
+
+### Comportement attendu face à un plugin inconnu
+
+1. Identifier le plugin dans ce fichier (structure et index des contrôles)
+2. Lire ses paramètres actuels via `fl_audit_track` ou `fl_get_plugin_params`
+3. Analyser la situation audio réelle de la piste
+4. Déterminer les réglages appropriés au contexte en cours
+5. Ne jamais appliquer mécaniquement les valeurs historiques
+
+---
+
 > Découvert le 2026-06-14 via `fl_discover_plugin_params` (résultat ~219 KB/plugin,
 > sauvegardé sur disque puis filtré). **Les vrais contrôles sont les premiers index ;
 > au-delà commence la pollution `MIDI CC #N` (128 entrées) jusqu'à total=4240.**
