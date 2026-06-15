@@ -131,10 +131,26 @@ fl_audit_track(track=2)   # T2
 
 ## 3. Étape ① — Analyse audio (Librosa)
 
-**Outil :** `fl_analyze_mix_folder` ou `fl_analyze_audio`
+**Format recommandé : MP3 plutôt que WAV.** Pour l'analyse de mix (LUFS, spectre, dynamique), WAV et MP3 à 256 kbps donnent des résultats identiques. Un WAV de 30 s = ~3 MB, un MP3 de 30 s = ~1 MB → bien dans le timeout MCP.
 
+**Workflow export depuis FL Studio :**
+1. File > Export > MP3 (pour le master global)
+2. Pour analyse par piste : File > Export > Wave > cocher "Sép. pistes du mix." → analyser 30 s seulement
+
+**Outil :**
 ```python
-fl_analyze_mix_folder("D:\\TEST MCP\\")
+fl_analyze_audio("D:\\TEST MCP\\TEST MCP_EFFET VOIX.wav")  # WAV ou MP3
+# Toujours passer analyze_seconds=30 si le MCP server n'a pas été redémarré récemment
+```
+
+**En cas de timeout MCP** : lancer directement via Python (contournement sans redémarrage) :
+```python
+# Dans un terminal PowerShell :
+python -c "
+import sys; sys.path.insert(0, 'D:/Craft/FL studio LLM/fl-studio-mcp/src')
+from fl_studio_mcp.tools.audio_analysis import analyze_audio
+import json; print(json.dumps(analyze_audio('D:/TEST MCP/fichier.wav'), indent=2))
+"
 ```
 
 Métriques clés par piste :

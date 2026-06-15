@@ -15,8 +15,12 @@ def analyze_audio(filepath: str, sr_target: int = 22050,
                   analyze_seconds: float = 30.0) -> dict:
     """Analyze a WAV/MP3/FLAC file and return mixing-relevant metrics.
 
+    Prefer MP3 exports over WAV for analysis: 30s MP3 @ 256kbps ≈ 1 MB vs 38 MB WAV.
+    LUFS, spectral curves, and dynamics are indistinguishable between WAV and MP3
+    for mix-decision purposes (differences only above 16 kHz, irrelevant here).
+
     analyze_seconds: only load this many seconds (default 30s — enough for
-    LUFS + spectral analysis, avoids timeout on large files).
+    LUFS + spectral analysis, avoids timeout on large WAV files).
 
     Returns a flat dict the LLM can act on directly:
     - Levels : peak_dbfs, rms_dbfs, lufs
