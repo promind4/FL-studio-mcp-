@@ -11,20 +11,20 @@ import librosa
 import numpy as np
 
 
-def analyze_audio(filepath: str, sr_target: int = 22050,
-                  analyze_seconds: float = 30.0) -> dict:
+def analyze_audio(filepath: str, sr_target: int = 11025,
+                  analyze_seconds: float | None = None) -> dict:
     """Analyze a WAV/MP3/FLAC file and return mixing-relevant metrics.
 
-    Prefer MP3 exports over WAV for analysis: 30s MP3 @ 256kbps ≈ 1 MB vs 38 MB WAV.
-    LUFS, spectral curves, and dynamics are indistinguishable between WAV and MP3
-    for mix-decision purposes (differences only above 16 kHz, irrelevant here).
+    Default sr_target=11025: analyzes the FULL file in ~3-5s regardless of duration.
+    Covers all mix-relevant bands up to 5.5 kHz (Nyquist). The 'air' (8-20 kHz) band
+    is not captured at this sr — use sr_target=22050 + analyze_seconds=30 if needed.
 
-    analyze_seconds: only load this many seconds (default 30s — enough for
-    LUFS + spectral analysis, avoids timeout on large WAV files).
+    WAV and MP3 (256kbps+) give identical results for LUFS/spectral analysis.
+    analyze_seconds: trim to first N seconds (None = full file, recommended).
 
     Returns a flat dict the LLM can act on directly:
     - Levels : peak_dbfs, rms_dbfs, lufs
-    - Dynamics : dynamic_range_db (P95–P10 of frame RMS)
+    - Dynamics : dynamic_range_db (P95-P10 of frame RMS)
     - Frequency bands : sub/low/low-mid/mid/high-mid/air energy in dB
     - Spectral feel : centroid_hz (brightness), rolloff_hz, bandwidth_hz
     - Transients : onset_rate_per_sec
@@ -52,17 +52,24 @@ def analyze_audio(filepath: str, sr_target: int = 22050,
     except Exception:
         lufs = round(rms_dbfs - 3.0, 1)
 
-    # --- Dynamics ---
+    # --- Dynamics (active frames only — silence skews percentiles to -inf) ---
     frame_rms = librosa.feature.rms(y=y, frame_length=2048, hop_length=512)[0]
     frame_db = 20 * np.log10(frame_rms + 1e-9)
-    dynamic_range = float(np.percentile(frame_db, 95) - np.percentile(frame_db, 10))
+    active = frame_db[frame_db > -60]
+    if len(active) > 10:
+        dynamic_range = float(np.percentile(active, 95) - np.percentile(active, 10))
+    else:
+        dynamic_range = 0.0
 
     # --- Frequency bands ---
+    nyquist = sr / 2
     S = np.abs(librosa.stft(y, n_fft=2048, hop_length=512))
     freqs = librosa.fft_frequencies(sr=sr, n_fft=2048)
 
     def _band_db(f_lo, f_hi):
-        mask = (freqs >= f_lo) & (freqs < f_hi)
+        if f_lo >= nyquist:
+            return None  # band above Nyquist at current sr
+        mask = (freqs >= f_lo) & (freqs < min(f_hi, nyquist))
         if not mask.any():
             return -96.0
         return float(20 * np.log10(np.sqrt(np.mean(S[mask] ** 2)) + 1e-9))
@@ -73,10 +80,10 @@ def analyze_audio(filepath: str, sr_target: int = 22050,
         "low_mid_250_1khz":  _band_db(250,  1000),
         "mid_1_4khz":        _band_db(1000, 4000),
         "high_mid_4_8khz":   _band_db(4000, 8000),
-        "air_8_20khz":       _band_db(8000, 20000),
+        "air_8_20khz":       _band_db(8000, 20000),  # None if sr<=16000
     }
 
-    # --- Spectral feel ---
+    # --- Spectral feel (note: centroid is underestimated at sr<=11025) ---
     centroid = float(np.mean(librosa.feature.spectral_centroid(y=y, sr=sr)))
     rolloff  = float(np.mean(librosa.feature.spectral_rolloff(y=y, sr=sr, roll_percent=0.85)))
     bandwidth = float(np.mean(librosa.feature.spectral_bandwidth(y=y, sr=sr)))
@@ -86,7 +93,7 @@ def analyze_audio(filepath: str, sr_target: int = 22050,
     onset_rate = round(len(onset_frames) / max(duration, 0.001), 2)
 
     # --- LLM-readable notes ---
-    notes = _mix_notes(peak_dbfs, lufs, dynamic_range, bands, centroid)
+    notes = _mix_notes(peak_dbfs, lufs, dynamic_range, bands, centroid, sr)
 
     return {
         "file": path.name,
@@ -99,7 +106,7 @@ def analyze_audio(filepath: str, sr_target: int = 22050,
         "spectral_rolloff_hz": round(rolloff, 0),
         "spectral_bandwidth_hz": round(bandwidth, 0),
         "onset_rate_per_sec": onset_rate,
-        "frequency_bands_db": {k: round(v, 1) for k, v in bands.items()},
+        "frequency_bands_db": {k: (round(v, 1) if v is not None else None) for k, v in bands.items()},
         "mix_notes": notes,
     }
 
@@ -146,9 +153,14 @@ def analyze_folder(folder: str, pattern: str = "*.wav",
     return {"folder": folder, "count": len(results), "tracks": results}
 
 
-def _mix_notes(peak_dbfs, lufs, dynamic_range, bands, centroid_hz) -> list[str]:
+def _mix_notes(peak_dbfs, lufs, dynamic_range, bands, centroid_hz,
+               sr: int = 44100) -> list[str]:
     """Generate plain-text observations for the LLM to reason about."""
     notes = []
+    nyquist = sr / 2
+
+    if sr <= 11025:
+        notes.append(f"Analysis at sr={sr} Hz (Nyquist {nyquist:.0f} Hz) — air band (8-20kHz) not captured, centroid underestimated.")
 
     if peak_dbfs > -1.0:
         notes.append("CLIPPING RISK: peak above -1 dBFS — add limiting before export.")
@@ -167,25 +179,24 @@ def _mix_notes(peak_dbfs, lufs, dynamic_range, bands, centroid_hz) -> list[str]:
     elif dynamic_range > 20:
         notes.append(f"High dynamic range ({dynamic_range:.1f} dB) — may need more compression.")
 
-    sub  = bands["sub_20_80hz"]
-    low  = bands["low_80_250hz"]
-    lmid = bands["low_mid_250_1khz"]
-    mid  = bands["mid_1_4khz"]
-    hmid = bands["high_mid_4_8khz"]
-    air  = bands["air_8_20khz"]
+    sub  = bands.get("sub_20_80hz") or -96
+    low  = bands.get("low_80_250hz") or -96
+    lmid = bands.get("low_mid_250_1khz") or -96
+    mid  = bands.get("mid_1_4khz") or -96
+    hmid = bands.get("high_mid_4_8khz")  # may be None at sr=11025
 
     if low - mid > 8:
         notes.append(f"Bottom-heavy: low band ({low:.1f} dB) >> mids ({mid:.1f} dB) — consider high-pass or low-mid cut.")
     if lmid - mid > 6:
-        notes.append(f"Muddy low-mids ({lmid:.1f} dB) — try cutting 200–500 Hz.")
-    if mid > hmid + 10:
-        notes.append(f"Lacking air/presence: highs ({hmid:.1f} dB) well below mids — consider high-shelf boost.")
-    if hmid > mid + 4:
-        notes.append(f"Harsh high-mids ({hmid:.1f} dB) — may sound fatiguing, consider dip at 4–8 kHz.")
+        notes.append(f"Muddy low-mids ({lmid:.1f} dB) — try cutting 200-500 Hz.")
+    if hmid is not None and sr > 16000 and mid > hmid + 10:
+        notes.append(f"Lacking presence: high-mids ({hmid:.1f} dB) well below mids — consider high-shelf boost.")
+    if hmid is not None and sr > 16000 and hmid > mid + 4:
+        notes.append(f"Harsh high-mids ({hmid:.1f} dB) — may sound fatiguing, consider dip at 4-8 kHz.")
 
-    if centroid_hz < 1500:
+    if sr > 16000 and centroid_hz < 1500:
         notes.append(f"Dark/warm character (centroid {centroid_hz:.0f} Hz).")
-    elif centroid_hz > 4000:
+    elif sr > 16000 and centroid_hz > 4000:
         notes.append(f"Bright/airy character (centroid {centroid_hz:.0f} Hz).")
 
     if not notes:
