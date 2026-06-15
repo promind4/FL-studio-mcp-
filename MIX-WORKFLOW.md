@@ -131,11 +131,13 @@ fl_audit_track(track=2)   # T2
 
 ## 3. Étape ① — Analyse audio (Librosa)
 
-**Format recommandé : MP3 plutôt que WAV.** Pour l'analyse de mix (LUFS, spectre, dynamique), WAV et MP3 à 256 kbps donnent des résultats identiques. Un WAV de 30 s = ~3 MB, un MP3 de 30 s = ~1 MB → bien dans le timeout MCP.
+**Format : WAV obligatoire pour le split tracks.** FL Studio ne propose pas le split par piste en MP3 — uniquement en WAV/AIFF. Le MP3 export = master stereo seul (utile pour vérifier le rendu global, pas pour l'analyse par piste).
+
+**`analyze_seconds=30` résout le problème de taille** : `librosa.load(path, duration=30)` ne lit que les 30 premières secondes du WAV, soit ~3 MB de données indépendamment de la taille du fichier. Pas besoin de changer de format.
 
 **Workflow export depuis FL Studio :**
-1. File > Export > MP3 (pour le master global)
-2. Pour analyse par piste : File > Export > Wave > cocher "Sép. pistes du mix." → analyser 30 s seulement
+1. File > Export > Wave > cocher "Sép. pistes du mix." → un WAV par piste
+2. Pour vérifier le master seul (rapide) : File > Export > MP3 → master stéréo unique
 
 **Outil :**
 ```python
