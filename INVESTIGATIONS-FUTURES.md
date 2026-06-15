@@ -1,5 +1,10 @@
 # Investigations futures — pistes non explorées ou abandonnées prématurément
 
+> **Point d'entrée :** Si tu arrives ici directement, lis d'abord [`ONBOARDING.md`](ONBOARDING.md) — règles permanentes et état actuel du projet.
+> **Rôle de ce document :** Fonctionnalités identifiées mais non implémentées. Pistes abandonnées prématurément. Idées à explorer après stabilisation.
+> **Lire avant :** [`ONBOARDING.md`](ONBOARDING.md), [`CONTEXT.md`](CONTEXT.md) §7-8 (état et prochaines étapes)
+> **Quand consulter :** En fin de session, pour planifier la suivante. Ou quand une fonctionnalité semble "impossible" — vérifier ici si elle a déjà été étudiée.
+
 > Ce fichier liste ce qu'on a **présumé impossible** ou **abandonné sans test complet**.
 > À reprendre une fois l'architecture MIDI stable, validée et commitée sur GitHub.
 > Classement par priorité d'impact potentiel.

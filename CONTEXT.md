@@ -1,11 +1,9 @@
-# FL Studio MCP — Contexte de reprise
+# FL Studio MCP — Contexte technique et état du projet
 
-> Fichier de handoff pour LLM ou développeur qui reprend ce projet à froid.
-> **Ordre de lecture recommandé :**
-> 1. [`MIX-WORKFLOW.md`](MIX-WORKFLOW.md) — **si tu viens mixer** (trame, ordre des opérations, anti-patterns)
-> 2. Ce fichier (`CONTEXT.md`) — architecture, outils disponibles, état du projet
-> 3. [`LECONS-APPRISES.md`](LECONS-APPRISES.md) — bugs critiques Pro-Q 3 / bridge
-> 4. [`PARAM-MAPS.md`](PARAM-MAPS.md) — index de paramètres par plugin
+> **Point d'entrée :** Si tu arrives ici directement, lis d'abord [`ONBOARDING.md`](ONBOARDING.md) — il contient les règles permanentes, la carte des documents et les chemins de lecture par scénario.
+> **Rôle de ce document :** Architecture MIDI SysEx, liste complète des outils MCP disponibles, configuration système, état actuel du projet et prochaines étapes.
+> **Lire avant :** [`ONBOARDING.md`](ONBOARDING.md)
+> **Lire après :** [`LECONS-APPRISES.md`](LECONS-APPRISES.md) (si tu codes le bridge) · [`PARAM-MAPS.md`](PARAM-MAPS.md) (si tu mixe)
 
 ---
 

@@ -1,9 +1,10 @@
-# Journal de débogage & leçons apprises — Contrôle Pro-Q 3 / FabFilter via MCP
+# Journal de débogage & leçons apprises — FL Studio MCP
 
-> **À lire en premier si tu reprends ce projet (humain ou IA).**
-> Ce fichier existe pour une raison : on a perdu plusieurs sessions sur des
-> fausses pistes à cause d'**un seul bug de lecture**. Tout est expliqué ici
-> pour que ça ne se reproduise pas. Date de la découverte clé : **2026-06-13**.
+> **Point d'entrée :** Si tu arrives ici directement, lis d'abord [`ONBOARDING.md`](ONBOARDING.md) — carte complète du projet et règles permanentes.
+> **Rôle de ce document :** Pièges identifiés, bugs connus, règles permanentes P1/P2. Chaque entrée documente une erreur réelle et comment l'éviter.
+> **Lire avant :** [`ONBOARDING.md`](ONBOARDING.md), [`MIX-WORKFLOW.md`](MIX-WORKFLOW.md)
+> **Lire après :** [`PARAM-MAPS.md`](PARAM-MAPS.md) (pour les index des contrôles des plugins cités ici)
+> **Date de la découverte clé initiale : 2026-06-13** (bug readback Pro-Q 3).
 
 ---
 

@@ -1,5 +1,10 @@
 # Cartes de contrôle des plugins — index normalisés (FL 2025)
 
+> **Point d'entrée :** Si tu arrives ici directement, lis d'abord [`ONBOARDING.md`](ONBOARDING.md) — il contient les règles permanentes dont R3 qui s'applique directement à ce fichier.
+> **Rôle de ce document :** Index des paramètres normalisés (0.0–1.0) par plugin. Pièges documentés. Historique des valeurs rencontrées.
+> **Lire avant :** [`ONBOARDING.md`](ONBOARDING.md), [`MIX-WORKFLOW.md`](MIX-WORKFLOW.md) (pour le contexte de chaque plugin dans la chaîne)
+> **Utilisation correcte :** consulter plugin par plugin, pendant le mixage, pour connaître les index — jamais pour copier les valeurs.
+
 ---
 
 ## ⚠️ AVERTISSEMENT FONDAMENTAL — À LIRE AVANT TOUTE UTILISATION

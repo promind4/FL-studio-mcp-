@@ -1,9 +1,10 @@
 # MIX-WORKFLOW — Méthodologie de mixage autonome via MCP
 
-> **À lire en premier lorsque tu commences une session de mixage.**
-> Ce fichier définit l'ordre exact des opérations, les pièges à éviter,
-> et les chemins vers les autres documents utiles.
-> Une lecture en début de session suffit. Mettre à jour dès qu'une nouvelle leçon est apprise.
+> **Point d'entrée :** Si tu arrives ici directement, lis d'abord [`ONBOARDING.md`](ONBOARDING.md) (8 min) — il contient les règles permanentes et la carte de tous les documents.
+> **Rôle de ce document :** Trame complète du mixage (étapes ⓪–⑨), anti-patterns, formules de calibration.
+> **Lire avant :** [`ONBOARDING.md`](ONBOARDING.md)
+> **Lire après / en parallèle :** [`LECONS-APPRISES.md`](LECONS-APPRISES.md) (pièges), [`PARAM-MAPS.md`](PARAM-MAPS.md) (plugin par plugin)
+> **Mettre à jour** dès qu'une nouvelle leçon est apprise (section §14 — Journal des sessions).
 
 ---
 
