@@ -286,6 +286,41 @@ confirmé visuellement à 2 bandes propres :
 
 ---
 
+## Règles permanentes — valables dès la première session
+
+Ces règles s'appliquent **quel que soit le projet ou la session**. Elles ne dépendent pas
+du contexte précédent et doivent être respectées même sans relire les sessions passées.
+
+### Règle P1 — Channel Rack avant les faders du mixer
+
+**Pour ajuster le niveau d'un élément individuel (voix, instru, bus) :**
+1. Utiliser `fl_set_channel_volume` (Channel Rack, pré-effets) **en priorité**
+2. Les faders du mixer (`fl_set_track_volume`) sont **réservés à** :
+   - La balance relative entre éléments (mixage proprement dit)
+   - La correction anti-clip du Master en l'absence de limiter
+   - L'ajustement des niveaux de bus (reverb, delay, glue)
+
+**Ce qui est interdit :** baisser le fader de T4 parce que l'AD LIB est trop fort → Channel Rack.
+Monter le fader de T2 parce que la voix est faible → Channel Rack.
+
+**Pourquoi :** un fader mixer déplacé pour compenser un niveau brut = marge de manœuvre perdue,
+structure de gain illisible, corrections ultérieures complexifiées.
+
+### Règle P2 — Couverture exhaustive des plugins sur un mixage complet
+
+Quand la demande est un **mixage complet**, chaque plugin de chaque piste doit être :
+1. Inspecté (lire ses paramètres clés)
+2. Évalué (état correct ? neutralisé ? inadapté ?)
+3. Statu explicite rendu (configurer / laisser / désactiver / reporter)
+
+**Aucun plugin ne peut être ignoré**, même si son calibrage est difficile ou inconnu.
+Si le calibrage est manquant, noter : "Ce plugin est en attente de calibration — non modifié".
+
+**Ce qui est interdit :** terminer la session après avoir traité 3 pistes sur 6 sans le dire.
+Sauter le CLA-76 parce qu'il est difficile à calibrer.
+
+---
+
 ## Leçons session 2026-06-15 — Mix multi-plugins & cartographie complète
 
 ### Piège #5 — Plugins « actifs » qui ne font rien (threshold/Peak Reduction neutres)

@@ -105,12 +105,43 @@ fl_audit_track(track=2)   # T2
 
 **Pour chaque session :** remplir ce tableau avec les slots réels renvoyés par `fl_audit_track`, pas ceux ci-dessus.
 
-### 2c. Décision pour chaque plugin
+### 2c. Couverture exhaustive — protocole obligatoire pour un mixage complet
 
-- ✅ **Configurer** — plugin utile, ajuster les paramètres
-- ⚡ **Laisser tel quel** — preset déjà adapté
+> ⚠️ **Règle fondamentale : zéro plugin ignoré.**
+> Lorsque la demande est un mixage complet de la session, chaque plugin de chaque piste
+> doit être inspecté et évaluer individuellement. Pas de raccourcis, pas d'arrêt prématuré.
+> Si la demande est ciblée (« ajuste uniquement la compression de T2 »), alors seule
+> cette portée est couverte. Mais sur un mixage complet, la couverture doit être totale.
+
+**Protocole par piste (à reproduire pour chaque track) :**
+
+```
+Pour chaque track T :
+  1. fl_audit_track(T) → liste tous les slots
+  2. Pour chaque slot occupé :
+     a. Lire les paramètres clés (threshold, ratio, gain, mix, etc.)
+     b. Statuer : l'état actuel est-il correct ? Neutralisé ? Inadapté ?
+     c. DÉCISION explicite — une des quatre options ci-dessous
+     d. Appliquer si nécessaire
+  3. Passer au track suivant — ne pas s'arrêter avant le dernier
+```
+
+**Décisions possibles pour chaque plugin :**
+- ✅ **Configurer** — ajuster les paramètres (threshold, ratio, gain, mix…)
+- ⚡ **Laisser tel quel** — preset adapté, rien à changer (le dire explicitement)
 - 🔕 **Désactiver** — présent mais inutile ou nuisible sur cette piste
 - ❌ **Retirer** — vraiment inapproprié (rare, nécessite UI)
+
+**Ce que cette règle interdit :**
+- ❌ S'arrêter après avoir traité 3 pistes sur 6 sans l'annoncer
+- ❌ Ignorer le CLA-76 parce qu'il est difficile à calibrer (le documenter comme "en attente de calibration")
+- ❌ Sauter le PuigTec parce que "il semble inactif" (lire ses params et confirmer)
+- ❌ Terminer une session sans avoir statué sur chaque slot de chaque piste
+
+**Ce qui est acceptable :**
+- ✅ Documenter « Ce plugin nécessite une écoute humaine, non modifié en attente » — c'est une décision explicite
+- ✅ Différer un plugin si une calibration spécifique manque — mais le mentionner dans le rapport final
+- ✅ Traiter les pistes en parallèle pour aller plus vite (fl_audit_track sur toutes en simultané)
 
 > **Ne jamais finir un mixage sans avoir statué explicitement sur chaque plugin de chaque piste.**
 
@@ -175,6 +206,36 @@ Métriques clés par piste :
 
 Le volume Channel Rack est le gain **pré-effets** — avant toute la chaîne FX mixer.  
 **C'est ici qu'on corrige les niveaux bruts.** Ne jamais utiliser le fader mixer pour ça sauf pour la correction globale du master (anti-clipping en l'absence de limiter).
+
+### ⚠️ Règle prioritaire — Hiérarchie des ajustements de niveau
+
+**Avant de toucher à un fader du mixer, se demander : « est-ce que le Channel Rack peut résoudre ça ? »**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  ORDRE DE PRIORITÉ pour ajuster le niveau d'un élément          │
+│                                                                  │
+│  1. Channel Rack (fl_set_channel_volume)  ← TOUJOURS EN PREMIER │
+│     → Corrige le niveau brut pré-effets                         │
+│     → Préserve la structure de gain de la chaîne FX             │
+│                                                                  │
+│  2. Fader Mixer (fl_set_track_volume)     ← SEULEMENT SI :      │
+│     → Mixage proprement dit (balance relative entre pistes)      │
+│     → Correction anti-clip sur le Master en l'absence de limiter │
+│     → Ajustement de bus (reverb, delay, glue)                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Pourquoi cette règle ?**
+- Toucher le fader mixer pour compenser un niveau brut → les faders dérivent, perdent leur sens de référence.
+- Un fader mixer à -12 dB pour compenser un clip gain trop fort = marge de manœuvre perdue pour le mixage réel.
+- Structure de gain lisible = mixage plus rapide et moins d'erreurs.
+
+**Ce que cette règle interdit concrètement :**
+- ❌ Baisser le fader de T4 AD LIB parce que la voix est trop forte dans le mix → utiliser Channel Rack
+- ❌ Monter le fader de T2 EFFET VOIX pour compenser une voix trop faible → utiliser Channel Rack
+- ✅ Baisser le fader Master de -4 dB pour éviter le clipping en l'absence de limiter → OK, c'est une correction de bus
+- ✅ Ajuster le send vers Insert 6 (reverb) → OK, c'est du routage bus
 
 ### Échelle de valeurs
 
@@ -376,19 +437,21 @@ Exemples : −4 dB → 0.653 · −6 dB → 0.600 · −9 dB → 0.505
 
 | ❌ Anti-pattern | ✅ Ce qu'il faut faire |
 |----------------|----------------------|
-| Modifier le fader mixer pour corriger un niveau | `fl_set_channel_volume` (Channel Rack, pré-effets) |
+| **Baisser/monter un fader mixer pour corriger un niveau individuel** | `fl_set_channel_volume` (Channel Rack, pré-effets) — le fader mixer = mixage et bus seulement |
+| **Arrêter le mixage avant d'avoir couvert tous les plugins** | Protocole exhaustif §2c — zéro plugin ignoré, décision explicite sur chacun |
 | Supposer qu'un plugin charge "à 0 dB" ou neutre | Lire ses paramètres avant toute modification |
 | Conclure "l'écriture a échoué" sur readback immédiat | Attendre 2–3s ou vérifier à l'écran |
 | Mixer sans avoir audité tous les plugins d'abord | Étape ⓪ obligatoire — `fl_audit_track` sur chaque piste |
-| Oublier de vérifier la Sibilance threshold | Toujours lire index 4 — si 1.0 → inactif |
+| Oublier de vérifier la Sibilance threshold ET le Range | Threshold index 4 ET Range index 5 — les deux doivent être < 1.0 |
+| Oublier de vérifier le Ratio du compresseur | Threshold seul ne suffit pas : ratio=1:1 = aucune compression même threshold ok |
 | Oublier les pistes doublures (LeadVox2, AdLibs) | `fl_get_channel_rack_info` → lister TOUS les canaux |
 | Modifier la clé Auto-Tune sans confirmer avec l'artiste | La tonalité = décision artistique, demander avant de changer |
-| Traiter uniquement l'EQ et ignorer les autres plugins | Chaque plugin de chaque piste doit être évalué |
 | Utiliser computer-use / bouger l'UI | Tout passe par le bridge MCP |
 | Commencer par le master | Stabiliser les pistes d'abord, master en dernier |
 | Cibler > 0 dB en clip gain | FL Studio cap silencieux à 0 dB (norm=1.0) — plafond réel du Channel Rack |
 | Analyser un grand WAV avec fl_analyze_audio sans `analyze_seconds` | Timeout MCP sur fichiers > 20 MB — toujours passer `analyze_seconds=30` |
 | Oublier d'activer les sends vers le bus reverb | Vérifier `fl_get_route_info(vocal, reverb_bus)` pour chaque piste vocale |
+| Clore la session sans Ctrl+S dans FL Studio | Les changements via MCP ne sont pas sauvegardés automatiquement |
 
 ---
 
