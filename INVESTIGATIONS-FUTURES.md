@@ -78,9 +78,43 @@ incrémental devient pertinent plus tard — sans cette trace, il n'y aurait auc
   proprement — noyé dans un pipeline ComfyUI + transformer 3.5B, qualifié d'« expérimental et
   incomplet » par les auteurs eux-mêmes ([issue #381](https://github.com/ace-step/ACE-Step/issues/381)).
   Rapport effort/risque mauvais comparé aux alternatives.
-- **MERT** (comparaison à une référence, priorité 2) : identifié comme bon candidat (95M/330M
-  paramètres, standalone, pas de reverse engineering nécessaire) mais pas encore testé. À reprendre
-  si le besoin de comparaison à une référence externe se confirme en usage réel.
+
+---
+
+## ✅ RÉSOLU — MERT : comparaison à une référence VALIDÉ (2026-06-16)
+
+**Besoin :** "à quel point ce mix sonne comme tel morceau de référence" — complète
+`fl_evaluate_mix_quality` (score absolu sans référence) et `fl_detect_masking` (conflits internes)
+qui ne répondent pas à cette question.
+
+**Testé et validé :** [`m-a-p/MERT-v1-95M`](https://huggingface.co/m-a-p/MERT-v1-95M) via
+`transformers` (`AutoModel` + `Wav2Vec2FeatureExtractor`, `trust_remote_code=True`). Installé dans
+le même venv isolé `.venv-audio-ai/` qu'audiobox-aesthetics (`pip install transformers` — torch et
+soundfile déjà présents, aucune nouvelle friction système).
+
+**Pourquoi pas de friction torchcodec/FFmpeg cette fois :** `torchaudio.functional.resample` est une
+opération tensorielle pure (pas de lecture de fichier) — elle ne passe jamais par `torchaudio.load`
+ni torchcodec. Chargement du WAV via `soundfile` (même contournement qu'`ai_ears_infer.py`), puis
+resample 44.1kHz → 24kHz (SR requis par MERT) avec `torchaudio.functional.resample` uniquement.
+
+**Choix des couches :** mean-pooling sur les couches 6-9 (sur 13), pas la dernière — zone validée
+dans le papier MERT pour la similarité timbre/musique (la couche finale dérive vers l'objectif de
+pré-entraînement masked-prediction, moins pertinente pour comparer deux mixes).
+
+**Validation (2026-06-16) :** test sur signaux synthétiques — deux sinusoïdes quasi-identiques →
+cosine_similarity = 1.0 ; sinusoïde vs bruit blanc → 0.45. Comportement cohérent, pas testé encore
+sur deux vrais morceaux de musique différents (à faire en usage réel pour calibrer les seuils de note
+qualitative — actuellement >0.85 "très proche", >0.65 "proche", >0.45 "écart notable", sinon "très
+différent").
+
+**Décision d'intégration :** même pattern que `fl_evaluate_mix_quality` — sous-processus
+`.venv-audio-ai/Scripts/python.exe mert_infer.py <fichier> <référence>`, tool `fl_compare_to_reference`.
+Coût ~15-30s/appel + téléchargement modèle ~380 Mo au premier appel (mis en cache ensuite). warning
+`nnAudio` au chargement est sans impact (feature CQT non utilisée par le chemin emprunté).
+
+**Limite connue :** le score cosine_similarity n'est PAS un jugement de qualité — un mix peut être
+très différent d'une référence sans être "moins bon" (genre, instrumentation différents). À utiliser
+uniquement quand l'utilisateur fournit explicitement un morceau-cible ("je veux que ça sonne comme X").
 
 ---
 

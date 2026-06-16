@@ -707,6 +707,28 @@ def build_server() -> FastMCP:
         return masking_analysis.detect_masking([str(f) for f in files])
 
     @mcp.tool()
+    def fl_compare_to_reference(filepath: str, reference_path: str,
+                                timeout_s: float = 120.0) -> dict:
+        """Compare a mix to a reference track via MERT embedding similarity.
+
+        Different question than fl_evaluate_mix_quality (no-reference score)
+        or fl_detect_masking (frequency conflicts): "how close does this mix
+        sound, in timbre/production character, to a reference track?". Use
+        when the user gives a target reference ("make it sound more like X").
+
+        Returns cosine_similarity in [-1, 1] (real music pairs typically land
+        ~0.3-0.95) — higher means closer character, NOT "better". Runs in
+        .venv-audio-ai/ via subprocess (m-a-p/MERT-v1-95M), ~15-30s/call,
+        first call also downloads the model (~380 MB, one-time).
+
+        EXAMPLE:
+          fl_compare_to_reference("D:\\\\TEST MCP\\\\my_mix.wav",
+                                  "D:\\\\TEST MCP\\\\reference_track.wav")
+        """
+        from .tools import mert_similarity
+        return mert_similarity.compare_to_reference(filepath, reference_path, timeout_s=timeout_s)
+
+    @mcp.tool()
     def fl_log_session_event(session: str, event_type: str, data: dict) -> dict:
         """Append one event to a session's JSON-lines journal (sessions/<session>.jsonl).
 
