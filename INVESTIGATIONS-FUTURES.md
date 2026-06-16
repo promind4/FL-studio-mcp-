@@ -102,10 +102,31 @@ dans le papier MERT pour la similarité timbre/musique (la couche finale dérive
 pré-entraînement masked-prediction, moins pertinente pour comparer deux mixes).
 
 **Validation (2026-06-16) :** test sur signaux synthétiques — deux sinusoïdes quasi-identiques →
-cosine_similarity = 1.0 ; sinusoïde vs bruit blanc → 0.45. Comportement cohérent, pas testé encore
-sur deux vrais morceaux de musique différents (à faire en usage réel pour calibrer les seuils de note
-qualitative — actuellement >0.85 "très proche", >0.65 "proche", >0.45 "écart notable", sinon "très
-différent").
+cosine_similarity = 1.0 ; sinusoïde vs bruit blanc → 0.45.
+
+**Calibration sur les 5 stems réels de la session (2026-06-16) :**
+| Paire | Similarité | Cohérence |
+|---|---|---|
+| Master vs Instrumental | 0.92 | très proche — le Master contient l'Instrumental + voix mixés |
+| Master vs EFFET VOIX | 0.82 | proche — une des composantes du Master |
+| Instrumental vs EFFET VOIX | 0.76 | plus éloigné — deux composantes différentes du même morceau |
+| EFFET VOIX vs EFFET VOIX 2 | 0.79 | proche — deux pistes vocales du même artiste |
+| EFFET VOIX vs AD LIB | 0.95 | très proche — même voix, ad-libs du même artiste |
+
+Tout est dans la fourchette haute (0.76-0.95) car les 5 fichiers viennent du même morceau —
+attendu, pas un signe de métrique peu discriminante (le sinus vs bruit synthétique prouve que
+0.45 est atteignable pour du contenu vraiment différent). Seuils qualitatifs actuels (>0.85 "très
+proche", >0.65 "proche", >0.45 "écart notable", sinon "très différent") cohérents avec ces deux
+jeux de données ; à recalibrer si l'usage réel avec un morceau-référence d'un autre artiste/genre
+montre des valeurs hors de cette plage.
+
+**Bug trouvé et corrigé pendant la calibration :** sur l'une des 5 paires, le parsing JSON a échoué
+— un warning `nnAudio` (lazy-import du sous-module CQT, non utilisé par le chemin emprunté) s'est
+imprimé sur stdout APRÈS la ligne JSON au lieu d'avant, cassant l'hypothèse "JSON = dernière ligne
+de stdout" dans `mert_similarity.py`. Fix : scanner toutes les lignes de stdout en partant de la fin
+et prendre la première qui parse en JSON valide, au lieu de supposer la position. Le même risque
+existe en théorie dans `ai_ears.py` (`audiobox-aesthetics`) mais n'a jamais été observé là — pas
+encore corrigé, à surveiller.
 
 **Décision d'intégration :** même pattern que `fl_evaluate_mix_quality` — sous-processus
 `.venv-audio-ai/Scripts/python.exe mert_infer.py <fichier> <référence>`, tool `fl_compare_to_reference`.

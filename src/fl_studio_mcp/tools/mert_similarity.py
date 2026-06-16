@@ -55,9 +55,17 @@ def compare_to_reference(filepath: str, reference_path: str,
     if proc.returncode != 0 and not proc.stdout.strip():
         return {"error": f"sous-processus en échec (code {proc.returncode}): {proc.stderr[-2000:]}"}
 
-    try:
-        result = json.loads(proc.stdout.strip().splitlines()[-1])
-    except (json.JSONDecodeError, IndexError):
+    # mert_infer.py prints exactly one JSON line, but stray stdout from
+    # lazy submodule warnings (e.g. nnAudio) can land before OR after it
+    # depending on flush timing — scan all lines, not just the last one.
+    result = None
+    for line in reversed(proc.stdout.strip().splitlines()):
+        try:
+            result = json.loads(line)
+            break
+        except json.JSONDecodeError:
+            continue
+    if result is None:
         return {"error": f"sortie inattendue du sous-processus: {proc.stdout[-2000:]} / stderr: {proc.stderr[-1000:]}"}
 
     if "error" in result:
