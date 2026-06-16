@@ -170,6 +170,13 @@ Après chaque modification du bridge, copier vers FL Studio et recharger (F5 dan
 | `fl_evaluate_mix_quality(filepath)` | Oreilles IA no-reference (audiobox-aesthetics, CE/CU/PC/PQ) — sous-processus `.venv-audio-ai/`, ~15-30s/appel |
 | `fl_detect_masking(folder)` | Détection de conflits fréquentiels localisés entre pistes (DSP pur, pas de ML) — quelles pistes se chevauchent, dans quelle bande, à quel point |
 
+### Mémoire de session
+| Outil | Description |
+|-------|-------------|
+| `fl_log_session_event(session, event_type, data)` | Journal JSON Lines append-only (`sessions/<session>.jsonl`) — trace les changements de plugins, scores, conflits de masking. Survit aux redémarrages du serveur MCP |
+| `fl_get_session_history(session, limit, event_type)` | Relit le journal d'une session, filtrable par type d'événement |
+| `fl_list_sessions` | Liste toutes les sessions journalisées avec compteur d'événements |
+
 ### Utilitaires
 | Outil | Description |
 |-------|-------------|

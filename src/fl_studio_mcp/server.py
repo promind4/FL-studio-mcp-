@@ -707,6 +707,50 @@ def build_server() -> FastMCP:
         return masking_analysis.detect_masking([str(f) for f in files])
 
     @mcp.tool()
+    def fl_log_session_event(session: str, event_type: str, data: dict) -> dict:
+        """Append one event to a session's JSON-lines journal (sessions/<session>.jsonl).
+
+        Durable trace of what was tried and what the tools said about it —
+        not conversation memory, survives across MCP server restarts.
+
+        event_type: free-form label, no fixed taxonomy. Suggested ones:
+          "plugin_change"   — {"track", "slot", "plugin", "param", "value", "reason"}
+          "mix_score"       — output of fl_evaluate_mix_quality, plus {"track"}
+          "masking_report"  — output of fl_detect_masking
+          "note"            — {"text": "..."} free-form observation
+
+        EXAMPLE:
+          fl_log_session_event("TEST_MCP_2026-06-16", "plugin_change",
+              {"track": "t2", "slot": 1, "plugin": "Pro-Q 3",
+               "change": "band1 freq 200Hz->180Hz", "reason": "muddy low-mid"})
+        """
+        from .tools import session_memory
+        return session_memory.log_event(session, event_type, data)
+
+    @mcp.tool()
+    def fl_get_session_history(session: str, limit: int | None = None,
+                               event_type: str | None = None) -> dict:
+        """Read back a session's journal (oldest first).
+
+        limit: only the last N events. event_type: filter to one label
+        (e.g. "mix_score") to skip noise from plugin_change entries.
+
+        EXAMPLE:
+          fl_get_session_history("TEST_MCP_2026-06-16", event_type="mix_score")
+        """
+        from .tools import session_memory
+        return session_memory.get_history(session, limit=limit, event_type=event_type)
+
+    @mcp.tool()
+    def fl_list_sessions() -> dict:
+        """List all known session journals with event count and last activity.
+
+        Use to find the session name to pass to fl_get_session_history when
+        you don't remember the exact session label used previously."""
+        from .tools import session_memory
+        return session_memory.list_sessions()
+
+    @mcp.tool()
     def fl_set_channel_volume(index: int, volume_db: float) -> dict:
         """Set the pre-effects clip gain of a Channel Rack channel in dB.
 

@@ -64,6 +64,15 @@ quels. Si l'export se fait avant le gain-staging final (faders pas encore régl�
 ne reflètent pas l'équilibre réel du mix fini — à utiliser après un passage Channel Rack/faders
 (règle R1), pas avant.
 
+**Suite (2026-06-16) — mémoire de session légère : `fl_log_session_event` / `fl_get_session_history` /
+`fl_list_sessions`.** Pas un système d'apprentissage (ça reste hors de portée à cette échelle) — juste
+un **journal durable** (`session_memory.py`, JSON Lines, append-only, `sessions/<session>.jsonl`) qui
+survit aux redémarrages du serveur MCP. Permet de tracer les changements de plugins, les scores
+`fl_evaluate_mix_quality` et les rapports `fl_detect_masking` au fil d'une session de mixage, et de
+les relire ensuite (filtrable par type d'événement). Sert de base si un système d'apprentissage
+incrémental devient pertinent plus tard — sans cette trace, il n'y aurait aucune donnée historique
+à exploiter.
+
 **Pistes écartées pendant cette investigation :**
 - **ACE-Step 1.5** (DCAE encoder pour conditionnement de référence) : composant non extractible
   proprement — noyé dans un pipeline ComfyUI + transformer 3.5B, qualifié d'« expérimental et
