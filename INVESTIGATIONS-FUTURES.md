@@ -11,6 +11,49 @@
 
 ---
 
+## ✅ RÉSOLU — Oreilles IA no-reference : audiobox-aesthetics VALIDÉ (2026-06-16)
+
+**Besoin :** évaluer la qualité perceptive d'un mix/mastering sans morceau de référence externe
+(priorité 1, voir `synthese_exploration_ai_audio.md`, `neural_ears_concept.md`, `final_architecture.md`
+à la racine du dépôt). Comparaison à une référence externe (MERT) reste un besoin secondaire non testé.
+
+**Testé et validé :** [`facebookresearch/audiobox-aesthetics`](https://github.com/facebookresearch/audiobox-aesthetics)
+(Meta, 2025) — modèle no-reference, 4 axes (CE/CU/PC/PQ). Installé en **venv Python isolé**
+(`.venv-audio-ai/`), **sans Docker** — torch 2.6+ supporte officiellement Python 3.13 nativement,
+donc pas besoin de conteneur pour ce package.
+
+**4 frictions rencontrées et résolues (détail complet : `PLAN-TEST-OREILLES-IA.md` avant suppression,
+sinon voir commit qui l'a introduit) :**
+1. `requests` manquant (dépendance non déclarée par le package) → `pip install requests`
+2. `huggingface_hub` 1.19.0 cassé (bug client httpx) → pin `huggingface_hub==0.27.1`
+3. SSL `CERTIFICATE_VERIFY_FAILED` → 3 antivirus (Avira/Defender/Avast) font de l'inspection TLS,
+   Python ne connaît pas leur certificat racine → `pip install pip-system-certs`
+4. `torchaudio` 2.11 exige `torchcodec` → exige FFmpeg système (absent, friction refusée) →
+   **contournement : ne pas utiliser la CLI `audio-aes`, charger le WAV avec `soundfile` et passer
+   le tensor directement à `predictor.forward([{"path": wav_tensor, "sample_rate": sr}])`**
+
+**Validation perceptive (2026-06-16) :** testé sur 5 exports d'une session réelle (Master, Instrumental,
+3 pistes vocales isolées). Le modèle distingue correctement le Master/Instrumental (PC et PQ hauts,
+6.0-8.2) des pistes vocales isolées non mixées (PC chute à 1.6-2.2) — confirmé cohérent à l'écoute
+par l'utilisateur.
+
+**Décision d'intégration :** sous-processus depuis `server.py` vers `.venv-audio-ai/Scripts/python.exe`
+(pas d'import torch dans le venv du serveur MCP principal — isolation délibérée). Nouveau tool prévu :
+`fl_evaluate_mix_quality`. Coût ~15-30s/appel (rechargement modèle à chaque sous-processus) — acceptable
+en usage asynchrone post-export. Optimisation différée si besoin : transformer le venv en petit serveur
+HTTP persistant (modèle chargé une fois) plutôt que de relancer un sous-processus à chaque appel.
+
+**Pistes écartées pendant cette investigation :**
+- **ACE-Step 1.5** (DCAE encoder pour conditionnement de référence) : composant non extractible
+  proprement — noyé dans un pipeline ComfyUI + transformer 3.5B, qualifié d'« expérimental et
+  incomplet » par les auteurs eux-mêmes ([issue #381](https://github.com/ace-step/ACE-Step/issues/381)).
+  Rapport effort/risque mauvais comparé aux alternatives.
+- **MERT** (comparaison à une référence, priorité 2) : identifié comme bon candidat (95M/330M
+  paramètres, standalone, pas de reverse engineering nécessaire) mais pas encore testé. À reprendre
+  si le besoin de comparaison à une référence externe se confirme en usage réel.
+
+---
+
 ## 🔴 PRIORITÉ HAUTE — Probablement faisable, jamais vraiment essayé
 
 ### 1. Charger un plugin dans un slot via l'API UI browser

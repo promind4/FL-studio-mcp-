@@ -651,6 +651,28 @@ def build_server() -> FastMCP:
             folder, newest_only_minutes=newest_only_minutes)
 
     @mcp.tool()
+    def fl_evaluate_mix_quality(filepath: str) -> dict:
+        """Evaluate perceptual mix/master quality WITHOUT a reference track ("AI ears").
+
+        Complements fl_analyze_audio (mathematical metrics: LUFS, spectrum, dynamics)
+        with a listening-based judgment from facebookresearch/audiobox-aesthetics
+        (no-reference, 4 axes, ~0-10 scale):
+          - CE : Content Enjoyment — agrément perçu à l'écoute
+          - CU : Content Usefulness — utilité/exploitabilité du contenu
+          - PC : Production Complexity — richesse perçue de la production
+          - PQ : Production Quality — qualité technique perçue de la production
+
+        Runs in an isolated venv (.venv-audio-ai/, separate from this server's
+        Python — see PLAN-TEST-OREILLES-IA.md). Cost: ~15-30s per call (model
+        reloads each invocation). Use after export, not in a tight loop.
+
+        EXAMPLE:
+          fl_evaluate_mix_quality("D:\\\\TEST MCP\\\\TEST MCP_2_Master.wav")
+        """
+        from .tools import ai_ears
+        return ai_ears.evaluate_mix_quality(filepath)
+
+    @mcp.tool()
     def fl_set_channel_volume(index: int, volume_db: float) -> dict:
         """Set the pre-effects clip gain of a Channel Rack channel in dB.
 
