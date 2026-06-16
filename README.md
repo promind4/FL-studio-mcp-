@@ -18,6 +18,7 @@ Ce document contient :
 | Document | Rôle |
 |----------|------|
 | [`ONBOARDING.md`](ONBOARDING.md) | **Point d'entrée unique** — règles + carte + chemins de lecture |
+| [`COMMANDS.md`](COMMANDS.md) | Registre des commandes métier (MIX_SESSION, MASTER, etc.) |
 | [`MIX-WORKFLOW.md`](MIX-WORKFLOW.md) | Trame du mixage autonome (étapes ⓪–⑨, anti-patterns) |
 | [`LECONS-APPRISES.md`](LECONS-APPRISES.md) | Pièges documentés session par session |
 | [`CONTEXT.md`](CONTEXT.md) | Architecture MIDI SysEx, outils MCP, état du projet |

@@ -57,12 +57,43 @@ Ne jamais conclure "l'écriture a échoué" sur un readback immédiat. Vérifier
 
 ---
 
+## Système de commandes — routage de l'intention
+
+> **Avant de chercher quelle méthodologie appliquer, vérifier si la demande correspond à une commande définie.**
+
+[`COMMANDS.md`](COMMANDS.md) est le registre central des intentions métier. Chaque commande fixe
+le comportement attendu (documents à consulter, workflow, vérifications obligatoires, critère de
+validation) — indépendamment du LLM qui l'exécute. **Reconnaître la commande même si l'utilisateur
+ne tape pas son nom exact** (ex. "mixe toute la session" → `MIX_SESSION`).
+
+| Commande | Intention | Portée |
+|----------|-----------|--------|
+| `MIX_SESSION` | Mixer l'ensemble de la session | Toutes les pistes, tous les plugins |
+| `MIX_TRACK` | Mixer une piste spécifique | Une piste, tous ses plugins |
+| `MIX_PLUGIN` | Travailler sur un plugin précis | Un plugin, dans le contexte de sa chaîne |
+| `MASTER` | Mastering du projet | Chaîne master + résultat global |
+| `ANALYZE_SESSION` | Analyser sans modifier | Lecture seule, aucune écriture |
+| `DOCUMENTATION` | Mettre à jour la base documentaire | Fichiers Markdown du projet |
+
+**En cas d'ambiguïté entre deux commandes** (ex. "travaille sur la compression de la voix" →
+`MIX_TRACK` ou `MIX_PLUGIN` ?) : demander confirmation à l'utilisateur plutôt que de deviner.
+
+→ Détails complets de chaque commande (workflow, checklist, critère de validation) : [`COMMANDS.md`](COMMANDS.md)
+
+---
+
 ## Carte documentaire
 
 ### Graphe de navigation
 
 ```
 ONBOARDING.md  ←  point d'entrée unique (tu es ici)
+│
+├─── ROUTAGE
+│    │
+│    └── COMMANDS.md
+│         Registre des commandes métier (MIX_SESSION, MASTER, etc.).
+│         → Consulter dès qu'une intention utilisateur doit être traduite en workflow.
 │
 ├─── RÈGLES & MÉTHODOLOGIE
 │    │
@@ -99,7 +130,8 @@ ONBOARDING.md  ←  point d'entrée unique (tu es ici)
 
 | Document | Rôle | Quand consulter |
 |----------|------|----------------|
-| **`ONBOARDING.md`** (ce fichier) | Point d'entrée — règles + carte | En premier, toujours |
+| **`ONBOARDING.md`** (ce fichier) | Point d'entrée — règles + carte + routage | En premier, toujours |
+| **`COMMANDS.md`** | Registre des commandes métier | Dès qu'une intention doit être traduite en workflow |
 | **`MIX-WORKFLOW.md`** | Trame mixage + anti-patterns | Avant de mixer |
 | **`LECONS-APPRISES.md`** | Pièges + bugs + règles P1/P2 | Après MIX-WORKFLOW, avant d'écrire |
 | **`CONTEXT.md`** | Architecture + outils MCP + état | Pour trouver un outil ou comprendre l'archi |
