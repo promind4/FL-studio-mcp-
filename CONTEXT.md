@@ -165,6 +165,10 @@ Après chaque modification du bridge, copier vers FL Studio et recharger (F5 dan
 |-------|-------------|
 | `fl_resolve_track_audio(track)` | Cherche le fichier audio associé à une piste |
 | `fl_get_track_stereo(track)` | Mesure la séparation stéréo |
+| `fl_analyze_audio(filepath)` | Librosa : LUFS, peak, dynamic range, bandes de fréquence, mix_notes |
+| `fl_analyze_mix_folder(folder)` | `fl_analyze_audio` sur tout un dossier de Split-export |
+| `fl_evaluate_mix_quality(filepath)` | Oreilles IA no-reference (audiobox-aesthetics, CE/CU/PC/PQ) — sous-processus `.venv-audio-ai/`, ~15-30s/appel |
+| `fl_detect_masking(folder)` | Détection de conflits fréquentiels localisés entre pistes (DSP pur, pas de ML) — quelles pistes se chevauchent, dans quelle bande, à quel point |
 
 ### Utilitaires
 | Outil | Description |

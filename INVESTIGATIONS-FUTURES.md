@@ -43,6 +43,27 @@ par l'utilisateur.
 en usage asynchrone post-export. Optimisation différée si besoin : transformer le venv en petit serveur
 HTTP persistant (modèle chargé une fois) plutôt que de relancer un sous-processus à chaque appel.
 
+**Suite (2026-06-16) — décomposition du feedback : `fl_detect_masking`.** Le score audiobox-aesthetics
+(CE/CU/PC/PQ) reste un agrégat — il dit "c'est moyen" sans dire pourquoi. Ajout d'un module DSP pur
+(`masking_analysis.py`, pas de ML) qui compare les pistes exportées séparément (workflow Split-export,
+même que `fl_analyze_mix_folder`) et détecte par paire de pistes et par bande de fréquence : le %
+de temps où les deux sont actives simultanément, et l'écart d'énergie entre elles. Un écart faible
++ chevauchement fort = conflit réel (aucune des deux n'est "devant"). Un écart fort = pas de conflit,
+une piste domine déjà.
+
+Testé sur les 4 stems de la session (`INSTRUMENTAL`, `AD LIB`, `EFFET VOIX`, `EFFET VOIX 2`) :
+aucun conflit détecté — résultat cohérent et explicable, pas un échec silencieux. Pour AD LIB vs
+Instrumental, l'écart d'énergie reste élevé (8-53 dB selon la bande) car les exports sont à leur
+niveau brut, pas encore calés au mix final. Pour les deux pistes voix entre elles, le chevauchement
+temporel est trop faible (0.3-1.6%) pour qu'il y ait compétition — probablement des ad-libs ponctuels,
+pas une doublure continue. Le détecteur a été débogué band par band avant cette conclusion (valeurs
+brutes inspectées, pas seulement le résultat filtré) pour écarter l'hypothèse d'un bug.
+
+**Limite connue à garder en tête :** la détection compare les niveaux des fichiers exportés tels
+quels. Si l'export se fait avant le gain-staging final (faders pas encore réglés), les écarts mesurés
+ne reflètent pas l'équilibre réel du mix fini — à utiliser après un passage Channel Rack/faders
+(règle R1), pas avant.
+
 **Pistes écartées pendant cette investigation :**
 - **ACE-Step 1.5** (DCAE encoder pour conditionnement de référence) : composant non extractible
   proprement — noyé dans un pipeline ComfyUI + transformer 3.5B, qualifié d'« expérimental et

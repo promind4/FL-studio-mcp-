@@ -673,6 +673,40 @@ def build_server() -> FastMCP:
         return ai_ears.evaluate_mix_quality(filepath)
 
     @mcp.tool()
+    def fl_detect_masking(folder: str = "D:\\TEST MCP\\Audio",
+                          pattern: str = "*.wav",
+                          newest_only_minutes: float | None = None) -> dict:
+        """Detect WHICH tracks fight in WHICH frequency band, and how badly.
+
+        Pairs with the same Split-export workflow as fl_analyze_mix_folder
+        (File > Export > Wave, tick 'Sép. pistes du mix.'). Pure DSP — answers
+        "low-mid congestion 250-1000Hz between BASS and VOICE, 42% of the time,
+        2.1 dB apart" instead of a single opaque quality score.
+
+        A small energy_gap_db with high overlap_pct = real masking risk
+        (neither track is in front). A large gap = one already dominates,
+        not flagged as a conflict.
+
+        EXAMPLE:
+          fl_detect_masking("D:\\\\TEST MCP\\\\Audio", newest_only_minutes=10)
+        """
+        import time
+        from pathlib import Path
+        from .tools import masking_analysis
+
+        root = Path(folder)
+        if not root.exists():
+            return {"error": f"Folder not found: {folder}"}
+        files = sorted(root.glob(pattern))
+        if newest_only_minutes is not None:
+            cutoff = time.time() - newest_only_minutes * 60
+            files = [f for f in files if f.stat().st_mtime >= cutoff]
+        if len(files) < 2:
+            return {"error": f"Need at least 2 WAVs matching {pattern!r} in {folder}, found {len(files)}."}
+
+        return masking_analysis.detect_masking([str(f) for f in files])
+
+    @mcp.tool()
     def fl_set_channel_volume(index: int, volume_db: float) -> dict:
         """Set the pre-effects clip gain of a Channel Rack channel in dB.
 
